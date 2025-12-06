@@ -9,6 +9,7 @@ from .models import (
     ComentarioFoto,
     Ativo,
     AtivoHistorico
+    
 )
 
 
@@ -19,8 +20,19 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'first_name', 'last_name', 'nome']
-    
+        fields = [
+            'id', 
+            'username', 
+            'email', 
+            'first_name', 
+            'last_name', 
+            'nome',
+            'is_staff',      
+            'is_superuser',  
+            'is_active',
+            'date_joined'  
+        ]    
+
     def get_nome(self, obj):
         return obj.get_full_name() or obj.username
 

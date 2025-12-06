@@ -4,6 +4,8 @@ import base64
 from io import BytesIO
 from datetime import timedelta
 
+from rest_framework.permissions import IsAdminUser
+
 from PIL import Image, ImageDraw, ImageFont
 import qrcode
 
@@ -21,6 +23,8 @@ from rest_framework.authtoken.models import Token
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from urllib3 import request
+
+
 
 from .models import (
     Chamado,
@@ -888,19 +892,24 @@ class AtivoViewSet(viewsets.ModelViewSet):
 # =========================
 # USUÁRIOS
 # =========================
-class UserViewSet(viewsets.ReadOnlyModelViewSet):
+# Mude de ReadOnlyModelViewSet para ModelViewSet
+class UserViewSet(viewsets.ModelViewSet):
     queryset = User.objects.all().order_by('username')
     serializer_class = UserSerializer
     filter_backends = [filters.SearchFilter]
     search_fields = ['username', 'first_name', 'last_name', 'email']
+    
+    # Protege a edição: Apenas Superusuários/Staff podem criar/editar/deletar
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'partial_update', 'destroy']:
+            return [IsAdminUser()]
+        return [IsAuthenticated()]
 
     @action(detail=False, methods=['get'])
     def me(self, request):
         if request.user.is_authenticated:
             return Response({'success': True, 'user': UserSerializer(request.user).data})
-
         return Response({'success': False, 'message': 'Usuário não autenticado'}, status=status.HTTP_401_UNAUTHORIZED)
-
 
 # =========================
 # DASHBOARD GERENCIAL
