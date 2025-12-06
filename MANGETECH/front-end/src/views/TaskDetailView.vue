@@ -1,12 +1,10 @@
 <template>
   <div class="space-y-6">
-    <!-- Loading State -->
     <div v-if="loading" class="flex flex-col items-center justify-center py-16">
       <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
       <p class="text-gray-600 mt-4 font-medium">Carregando chamado...</p>
     </div>
 
-    <!-- Error State -->
     <div v-else-if="error" class="bg-white rounded-xl border border-red-200 shadow-sm p-6">
       <div class="text-center py-8">
         <div class="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
@@ -23,9 +21,7 @@
       </div>
     </div>
 
-    <!-- Task Detail -->
     <div v-else-if="task">
-      <!-- Header com Breadcrumb -->
       <div class="flex items-center justify-between mb-6">
         <div class="flex items-center gap-3">
           <button
@@ -45,7 +41,6 @@
           </div>
         </div>
 
-        <!-- Botões de Ação -->
         <div class="flex items-center gap-2">
           <button
             @click="showCommentModal = true"
@@ -64,11 +59,8 @@
         </div>
       </div>
 
-      <!-- Grid Principal -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <!-- Coluna Principal (2/3) -->
         <div class="lg:col-span-2 space-y-6">
-          <!-- Informações Principais -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h2 class="text-xl font-semibold text-gray-900 mb-4">{{ task.titulo }}</h2>
             
@@ -88,44 +80,34 @@
                   </div>
                 </div>
 
-                <div>
-                  <label class="text-sm font-medium text-gray-500">Categoria</label>
-                  <p class="mt-1 text-gray-900">{{ task.categoria }}</p>
                 </div>
-              </div>
             </div>
           </div>
 
-          <!-- Timeline de Comentários -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-6">
               <h3 class="text-lg font-semibold text-gray-900">Histórico e Comentários</h3>
               <span class="text-sm text-gray-500">{{ comentarios.length }} {{ comentarios.length === 1 ? 'item' : 'itens' }}</span>
             </div>
 
-            <!-- Lista de Comentários -->
             <div v-if="comentarios.length > 0" class="space-y-6">
               <div
                 v-for="(comentario, index) in comentarios"
                 :key="comentario.id"
                 class="relative"
               >
-                <!-- Timeline Line -->
                 <div
                   v-if="index < comentarios.length - 1"
                   class="absolute left-5 top-12 bottom-0 w-0.5 bg-gray-200"
                 ></div>
 
-                <!-- Comentário Card -->
                 <div class="flex gap-4">
-                  <!-- Avatar -->
                   <div class="flex-shrink-0">
                     <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                       <User :size="20" class="text-blue-600" />
                     </div>
                   </div>
 
-                  <!-- Conteúdo -->
                   <div class="flex-1 bg-gray-50 rounded-lg p-4">
                     <div class="flex items-start justify-between mb-2">
                       <div>
@@ -141,15 +123,14 @@
                     </div>
                     <p class="text-gray-700 whitespace-pre-wrap">{{ comentario.texto }}</p>
 
-                    <!-- Fotos do Comentário -->
                     <div v-if="comentario.fotos && comentario.fotos.length > 0" class="mt-3 grid grid-cols-3 gap-2">
                       <img
                         v-for="(foto, fotoIndex) in comentario.fotos"
-                        :key="fotoIndex"
-                        :src="foto"
+                        :key="foto.id || fotoIndex"
+                        :src="foto.url" 
                         :alt="`Foto ${fotoIndex + 1}`"
-                        class="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition"
-                        @click="openImagePreview(foto)"
+                        class="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition border border-gray-200"
+                        @click="openImagePreview(foto.url)"
                       />
                     </div>
                   </div>
@@ -157,7 +138,6 @@
               </div>
             </div>
 
-            <!-- Empty State -->
             <div v-else class="text-center py-12">
               <MessageSquare :size="40" class="mx-auto text-gray-300 mb-3" />
               <p class="text-gray-500 mb-4">Nenhum comentário ainda</p>
@@ -171,16 +151,14 @@
           </div>
         </div>
 
-        <!-- Sidebar (1/3) -->
         <div class="space-y-6">
-          <!-- Informações do Ativo -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Ativo Relacionado</h3>
             <div class="space-y-3">
               <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
                 <Package :size="20" class="text-gray-600" />
                 <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-500">Código</p>
+                  <p class="text-sm font-medium text-gray-500">Código/Nome</p>
                   <p class="text-sm font-semibold text-gray-900 truncate">{{ task.ativo }}</p>
                 </div>
               </div>
@@ -195,22 +173,27 @@
             </div>
           </div>
 
-          <!-- Responsáveis -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Equipe</h3>
-            <div class="space-y-3">
+            <div class="space-y-4">
               <div>
                 <label class="text-sm font-medium text-gray-500">Solicitante</label>
-                <p class="mt-1 text-gray-900">{{ task.solicitante || 'Não informado' }}</p>
+                <p class="mt-1 text-gray-900 font-medium">
+                  {{ task.solicitante_nome || 'Não informado' }}
+                </p>
               </div>
-              <div>
-                <label class="text-sm font-medium text-gray-500">Responsável</label>
-                <p class="mt-1 text-gray-900">{{ task.responsavel || 'Não atribuído' }}</p>
+              <div class="pt-4 border-t border-gray-100">
+                <label class="text-sm font-medium text-gray-500">Responsáveis</label>
+                <p class="mt-1 text-gray-900 font-medium">
+                  <span v-if="task.responsaveis_nomes && task.responsaveis_nomes.length > 0">
+                    {{ task.responsaveis_nomes.join(', ') }}
+                  </span>
+                  <span v-else class="text-gray-400 italic">Não atribuído</span>
+                </p>
               </div>
             </div>
           </div>
 
-          <!-- Datas -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Datas</h3>
             <div class="space-y-3">
@@ -218,9 +201,9 @@
                 <label class="text-sm font-medium text-gray-500">Criação</label>
                 <p class="mt-1 text-gray-900">{{ formatDate(task.data_criacao) }}</p>
               </div>
-              <div v-if="task.data_conclusao">
-                <label class="text-sm font-medium text-gray-500">Conclusão</label>
-                <p class="mt-1 text-gray-900">{{ formatDate(task.data_conclusao) }}</p>
+              <div v-if="task.data_sugerida">
+                <label class="text-sm font-medium text-gray-500">Previsão</label>
+                <p class="mt-1 text-gray-900">{{ formatDate(task.data_sugerida) }}</p>
               </div>
             </div>
           </div>
@@ -228,7 +211,6 @@
       </div>
     </div>
 
-    <!-- Modals -->
     <AddCommentModal
       v-if="task"
       :is-open="showCommentModal"
@@ -266,19 +248,31 @@ import {
 import AddCommentModal from '../components/modals/AddCommentModal.vue'
 import AdvanceStatusModal from '../components/modals/AdvanceStatusModal.vue'
 
+// Definição da interface das Fotos
+interface Foto {
+  id: number
+  imagem: string
+  url: string
+  data_upload: string
+}
+
+// Interface atualizada conforme Backend Serializer
 interface TaskDetail {
   id: number | string
   titulo: string
   descricao: string
   status: string
   urgencia: string
-  categoria: string
   ativo: string
   ambiente: string
-  solicitante?: string
-  responsavel?: string
+  // Campos de nomes vindos do backend
+  solicitante_nome?: string
+  responsaveis_nomes?: string[]
+  // Campos originais (IDs ou objetos)
+  solicitante?: any
+  responsavel?: any
   data_criacao: string
-  data_conclusao?: string
+  data_sugerida?: string
 }
 
 interface Comentario {
@@ -287,7 +281,8 @@ interface Comentario {
   autor: string
   data_criacao: string
   tipo?: string
-  fotos?: string[]
+  // Fotos é um array de objetos
+  fotos?: Foto[]
 }
 
 const route = useRoute()
@@ -325,6 +320,7 @@ const statusClass = (status: string) => {
 }
 
 const formatDate = (date: string) => {
+  if (!date) return 'N/A'
   try {
     return format(new Date(date), 'dd/MM/yyyy HH:mm')
   } catch {
@@ -341,34 +337,42 @@ const loadTask = async () => {
     const data = await tasksApi.getById(Number(taskId))
     task.value = data as TaskDetail
     
-    // Carrega comentários do próprio objeto retornado
+    // Processar comentários
+    let comentariosProcessados: Comentario[] = []
+
     if (data.comentarios && Array.isArray(data.comentarios)) {
-      comentarios.value = data.comentarios.map((c: any) => ({
+      const comms = data.comentarios.map((c: any) => ({
         id: c.id,
         texto: c.texto,
+        // Backend envia usuario_nome no serializer
         autor: c.usuario_nome || c.autor?.username || 'Anônimo',
         data_criacao: c.data_criacao || c.timestamp,
         tipo: 'comentario',
+        // Backend envia lista de objetos foto {id, url, ...}
         fotos: c.fotos || []
       }))
+      comentariosProcessados = [...comentariosProcessados, ...comms]
     }
     
-    // Adiciona histórico de status à timeline
+    // Processar Histórico
     if (data.historico && Array.isArray(data.historico)) {
       const historicoFormatado = data.historico.map((h: any) => ({
-        id: h.id,
+        id: h.id + 10000, // Offset ID para evitar colisão com comentários na key
         texto: h.descricao,
         autor: h.usuario_nome || 'Sistema',
         data_criacao: h.data_criacao || h.timestamp,
         tipo: 'status_change',
-        fotos: h.fotos?.map((f: any) => f.url || f.imagem) || []
+        // No histórico, as fotos também vêm como objetos no serializer ChamadoStatusHistorySerializer -> fotos
+        fotos: h.fotos || [] 
       }))
-      
-      // Combina comentários e histórico, ordena por data
-      comentarios.value = [...comentarios.value, ...historicoFormatado].sort((a, b) => {
-        return new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime()
-      })
+      comentariosProcessados = [...comentariosProcessados, ...historicoFormatado]
     }
+
+    // Ordenar timeline por data (mais recente primeiro)
+    comentarios.value = comentariosProcessados.sort((a, b) => {
+      return new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime()
+    })
+
   } catch (err: any) {
     console.error('Erro ao carregar chamado:', err)
     error.value = err.response?.data?.detail || err.response?.data?.message || 'Chamado não encontrado'
@@ -377,41 +381,22 @@ const loadTask = async () => {
   }
 }
 
-const handleCommentAdded = (comentario: Comentario) => {
-  // Adiciona o novo comentário ao topo da lista
-  comentarios.value.unshift({
-    ...comentario,
-    autor: comentario.autor || 'Você',
-    data_criacao: new Date().toISOString(),
-    tipo: 'comentario'
-  })
-  
+const handleCommentAdded = (comentario: any) => {
+  // Recarrega tudo para garantir sincronia com backend (e URLs de imagens corretas)
+  loadTask()
   uiStore.showToast('success', 'Comentário adicionado com sucesso!')
 }
 
 const handleStatusChanged = (statusChange: any) => {
-  if (task.value) {
-    task.value.status = statusChange.status
-  }
-  
-  // Adiciona mudança de status ao histórico
-  comentarios.value.unshift({
-    id: Date.now(),
-    texto: statusChange.descricao,
-    autor: statusChange.usuario || 'Você',
-    data_criacao: statusChange.data_mudanca || new Date().toISOString(),
-    tipo: 'status_change',
-    fotos: statusChange.fotos || []
-  })
-  
-  uiStore.showToast('success', 'Status alterado com sucesso!')
-  
-  // Recarrega os dados do chamado para pegar as fotos do backend
+  // Recarrega para atualizar status e histórico
   loadTask()
+  uiStore.showToast('success', 'Status alterado com sucesso!')
 }
 
 const openImagePreview = (imageUrl: string) => {
-  window.open(imageUrl, '_blank')
+  if (imageUrl) {
+    window.open(imageUrl, '_blank')
+  }
 }
 
 onMounted(() => {

@@ -306,6 +306,13 @@ export const assetsApi = {
 // ============================================
 // USERS API
 // ============================================
+// src/api/client.ts (ou index.ts)
+
+// ...
+
+// ============================================
+// USERS API
+// ============================================
 export const usersApi = {
   async getAll(filters?: any) {
     console.log('usersApi.getAll - Buscando usuários...')
@@ -315,14 +322,22 @@ export const usersApi = {
     return users
   },
 
-  async getById(id: number) {
+  async getById(id: number | string) {
     console.log('usersApi.getById - ID:', id)
     const { data } = await api.get(`/usuarios/${id}/`)
     console.log('Usuário carregado:', data)
     return data as User
   },
 
-  async getStatistics(id: number) {
+  // --- ADICIONE ESTA FUNÇÃO QUE ESTAVA FALTANDO ---
+  async update(id: number | string, data: any) {
+    console.log('usersApi.update - ID:', id, 'Data:', data)
+    const response = await api.patch(`/usuarios/${id}/`, data)
+    return response.data
+  },
+  // ------------------------------------------------
+
+  async getStatistics(id: number | string) {
     console.log('usersApi.getStatistics - ID:', id)
     try {
       const { data } = await api.get(`/usuarios/${id}/estatisticas/`)
@@ -333,7 +348,6 @@ export const usersApi = {
       
       // Se o endpoint não existir ainda (404), retorna dados vazios
       if (error.response?.status === 404) {
-        console.warn('Endpoint de estatísticas ainda não implementado no backend')
         return {
           success: true,
           data: {
@@ -346,7 +360,6 @@ export const usersApi = {
           }
         }
       }
-      
       throw error
     }
   },

@@ -296,7 +296,10 @@ export const userApi = {
   async getMe() {
     const response = await api.get('/usuarios/me/')
     return response.data
-  }
+  },
+ 
+  // ADICIONE ISTO TAMBÉM (Atalho para estatísticas)
+  
 }
 
 // ===== DASHBOARD API =====
