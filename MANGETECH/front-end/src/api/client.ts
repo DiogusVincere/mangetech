@@ -3,7 +3,7 @@ import axios from 'axios'
 
 // ===== CONFIGURAÇÃO BASE DO AXIOS =====
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: 'https://gothan-tech-dfcqa4daf2d4a3ax.westus3-01.azurewebsites.net/api',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'

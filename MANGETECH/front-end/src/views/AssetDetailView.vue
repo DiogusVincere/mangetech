@@ -282,6 +282,8 @@
 import QRCodeModal from '@/components/modals/QRCodeModal.vue'
 import { QrCode } from 'lucide-vue-next'
 
+const API_BASE = 'https://gothan-tech-dfcqa4daf2d4a3ax.westus3-01.azurewebsites.net/api'
+
 export default {
   components: {
     QRCodeModal,
@@ -345,7 +347,7 @@ export default {
       this.loading = true
       try {
         const id = window.location.pathname.split('/').pop()
-        const response = await fetch(`http://localhost:8000/api/ativos/${id}/`, {
+        const response = await fetch(`${API_BASE}/ativos/${id}/`, {
           headers: {
             'Authorization': `Token ${localStorage.getItem('token')}`
           }
@@ -366,7 +368,7 @@ export default {
       
       this.loadingTasks = true
       try {
-        const response = await fetch(`http://localhost:8000/api/ativos/${this.asset.id}/chamados/`, {
+        const response = await fetch(`${API_BASE}/ativos/${this.asset.id}/chamados/`, {
           headers: {
             'Authorization': `Token ${localStorage.getItem('token')}`
           }
@@ -399,7 +401,7 @@ export default {
       this.errorMessage = ''
       
       try {
-        const response = await fetch(`http://localhost:8000/api/ativos/${this.asset.id}/`, {
+        const response = await fetch(`${API_BASE}/ativos/${this.asset.id}/`, {
           method: 'PATCH',
           headers: {
             'Authorization': `Token ${localStorage.getItem('token')}`,
