@@ -7,7 +7,13 @@ import '../../models/ativo.dart';
 
 class ApiService {
   // ========== CONFIGURAÇÃO DA API ==========
-  static const String baseUrl = 'http://10.0.2.2:8000/api';
+  // URL da API. Para apontar para outro servidor sem mexer no código:
+  //   flutter run --dart-define=API_URL=http://192.168.0.10:8000/api
+  // 10.0.2.2 é o localhost da máquina visto de dentro do emulador Android.
+  static const String baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'http://10.0.2.2:8000/api',
+  );
   static const Duration timeout = Duration(seconds: 30);
 
   // ========== HEADERS ==========

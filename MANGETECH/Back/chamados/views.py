@@ -22,7 +22,6 @@ from rest_framework.authtoken.models import Token
 
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
-from urllib3 import request
 
 
 

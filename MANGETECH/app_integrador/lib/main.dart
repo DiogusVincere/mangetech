@@ -4,7 +4,7 @@ import 'ui/screens/login_screen.dart';
 import 'ui/screens/cadastro_screen.dart';
 import 'ui/screens/recuperacao_senha_screen.dart';
 import 'ui/screens/dashboard_screen.dart';
-import 'ui/screens/dashBoardGerencial_screen.dart';
+import 'ui/screens/dashboardgerencial_screen.dart';
 import 'ui/screens/gestao_ativos_screen.dart';
 import 'ui/screens/visualizar_perfil.dart';
 import 'data/providers/chamado_provider.dart';

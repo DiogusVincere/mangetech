@@ -281,8 +281,7 @@
 <script>
 import QRCodeModal from '@/components/modals/QRCodeModal.vue'
 import { QrCode } from 'lucide-vue-next'
-
-const API_BASE = 'https://gothan-tech-dfcqa4daf2d4a3ax.westus3-01.azurewebsites.net/api'
+import { assetsApi } from '@/api/client'
 
 export default {
   components: {
@@ -346,16 +345,8 @@ export default {
     async loadAsset() {
       this.loading = true
       try {
-        const id = window.location.pathname.split('/').pop()
-        const response = await fetch(`${API_BASE}/ativos/${id}/`, {
-          headers: {
-            'Authorization': `Token ${localStorage.getItem('token')}`
-          }
-        })
-        
-        if (!response.ok) throw new Error('Ativo não encontrado')
-        
-        this.asset = await response.json()
+        const id = this.$route?.params?.id ?? window.location.pathname.split('/').pop()
+        this.asset = await assetsApi.getById(id)
       } catch (error) {
         console.error('Erro ao carregar ativo:', error)
         this.asset = null
@@ -368,16 +359,7 @@ export default {
       
       this.loadingTasks = true
       try {
-        const response = await fetch(`${API_BASE}/ativos/${this.asset.id}/chamados/`, {
-          headers: {
-            'Authorization': `Token ${localStorage.getItem('token')}`
-          }
-        })
-        
-        if (response.ok) {
-          const data = await response.json()
-          this.relatedTasks = data.chamados || []
-        }
+        this.relatedTasks = await assetsApi.getTasks(this.asset.id)
       } catch (error) {
         console.error('Erro ao carregar chamados:', error)
         this.relatedTasks = []
@@ -401,18 +383,7 @@ export default {
       this.errorMessage = ''
       
       try {
-        const response = await fetch(`${API_BASE}/ativos/${this.asset.id}/`, {
-          method: 'PATCH',
-          headers: {
-            'Authorization': `Token ${localStorage.getItem('token')}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(this.editData)
-        })
-        
-        if (!response.ok) throw new Error('Erro ao atualizar ativo')
-        
-        this.asset = await response.json()
+        this.asset = await assetsApi.update(this.asset.id, this.editData)
         this.editMode = false
         alert('Ativo atualizado com sucesso!')
       } catch (error) {

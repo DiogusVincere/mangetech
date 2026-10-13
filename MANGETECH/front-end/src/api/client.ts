@@ -2,8 +2,13 @@
 import axios from 'axios'
 
 // ===== CONFIGURAÇÃO BASE DO AXIOS =====
+// URL da API: defina VITE_API_URL no .env do front (ver .env.example).
+// Sem a variável, usa a URL que estava publicada no Azure.
+export const API_URL: string =
+  import.meta.env.VITE_API_URL || 'https://gothan-tech-dfcqa4daf2d4a3ax.westus3-01.azurewebsites.net/api'
+
 const api = axios.create({
-  baseURL: 'https://gothan-tech-dfcqa4daf2d4a3ax.westus3-01.azurewebsites.net/api',
+  baseURL: API_URL,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
