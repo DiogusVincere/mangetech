@@ -94,7 +94,7 @@ copy .env.example .env          # VITE_API_URL=http://localhost:8000/api
 npm run dev
 ```
 
-Abre em `http://localhost:5173`. `npm run build` gera a pasta `dist/`; no Vercel, o `vercel.json` já redireciona todas as rotas para o `index.html`. Sem `VITE_API_URL`, o front usa a URL da API que estava publicada no Azure (hoje fora do ar).
+Abre em `http://localhost:5173`. `npm run build` gera a pasta `dist/`; no Vercel, o `vercel.json` já redireciona todas as rotas para o `index.html`. Sem `VITE_API_URL`, o front usa a API publicada no Render (`https://mangetech-api.onrender.com/api`).
 
 ### App (Flutter)
 
@@ -120,7 +120,7 @@ As senhas são públicas de propósito. O comando pode rodar mais de uma vez: n�
 ## Demonstração
 
 - Front web: <https://integrador4-final.vercel.app>
-- A API original, hospedada no Azure durante o curso, saiu do ar. O [`render.yaml`](render.yaml) publica uma nova no Render (Blueprint): ele instala as dependências, roda `migrate` e `seed_demo` e sobe o `gunicorn`. Depois de publicar, defina `VITE_API_URL=https://<nome>.onrender.com/api` no projeto do Vercel e faça um novo deploy do front.
+- API: `https://mangetech-api.onrender.com/api` (Render, plano gratuito: dorme sem uso e leva uns 30 s para acordar no primeiro acesso; o banco é reposto pelo `seed_demo` a cada deploy). A API original do curso, no Azure, saiu do ar; o [`render.yaml`](render.yaml) é o que publica esta.
 
 <!-- prints: adicionar -->
 
