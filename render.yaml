@@ -1,0 +1,34 @@
+# Blueprint do Render para publicar a API Django do MangeTech.
+# Documentação: https://render.com/docs/blueprint-spec
+#
+# No plano gratuito o disco é efêmero: o SQLite recomeça a cada deploy e o
+# seed_demo do startCommand repõe os dados de demonstração. Depois de publicar,
+# aponte o front (VITE_API_URL no Vercel) para https://<nome>.onrender.com/api
+# e, se a URL do front mudar, atualize CORS_ALLOWED_ORIGINS aqui.
+
+services:
+  - type: web
+    name: mangetech-api
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: pip install -r MANGETECH/Back/requirements.txt && cd MANGETECH/Back && python manage.py collectstatic --noinput
+    startCommand: cd MANGETECH/Back && python manage.py migrate && python manage.py seed_demo && gunicorn Back.wsgi:application
+    healthCheckPath: /admin/login/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://integrador4-final.vercel.app,https://diogusvincere.github.io
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://*.onrender.com
+      - key: WEB_CONCURRENCY
+        value: "2"
