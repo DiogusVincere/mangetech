@@ -117,6 +117,12 @@ flutter run --dart-define=API_URL=http://10.0.2.2:8000/api
 
 As senhas são públicas de propósito. O comando pode rodar mais de uma vez: não duplica nada.
 
+## Telas
+
+![Login do painel web](docs/prints/web-login.png)
+
+Painel web em https://integrador4-final.vercel.app (entre com `demo@mangetech.local` / `demo1234`). O app Flutter roda em https://diogusvincere.github.io/mangetech/ numa moldura de celular.
+
 ## Demonstração
 
 - Front web: <https://integrador4-final.vercel.app>
@@ -124,7 +130,6 @@ As senhas são públicas de propósito. O comando pode rodar mais de uma vez: n�
 - App (web): <https://diogusvincere.github.io/mangetech/> — publicada pelo workflow [`web.yml`](.github/workflows/web.yml) a cada push na `main` que mexa em `MANGETECH/app_integrador/`, depois que o GitHub Pages for ligado (Settings > Pages > Source: GitHub Actions). O app aparece numa moldura de celular; `…/mangetech/app/` abre em tela cheia. Aponta para a API no Render.
 - App (APK Android): na página de [Releases](https://github.com/DiogusVincere/mangetech/releases) (gerado pelo workflow [`apk.yml`](.github/workflows/apk.yml) a cada tag `v*`; cada execução também deixa o APK como artefato). Assinado com a chave de debug: instala em qualquer aparelho Android, mas não serve para a Play Store.
 
-<!-- prints: adicionar -->
 
 ## Equipe
 
