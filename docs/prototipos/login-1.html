@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Entrar | Sprint I</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .input-error {
+            border-color: #EF4444 !important;
+        }
+        .ripple {
+            position: relative;
+            overflow: hidden;
+        }
+        .ripple:after {
+            content: "";
+            display: block;
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+            background-image: radial-gradient(circle, #fff 10%, transparent 10%);
+            background-repeat: no-repeat;
+            background-position: 50%;
+            transform: scale(10,10);
+            opacity: 0;
+            transition: transform .5s, opacity 1s;
+        }
+        .ripple:active:after {
+            transform: scale(0,0);
+            opacity: 0.3;
+            transition: 0s;
+        }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3B82F6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex items-center justify-center p-4">
+    <div class="w-full max-w-md" data-aos="fade-up">
+        <!-- Logo -->
+        <div class="flex justify-center mb-8">
+            <div class="bg-blue-500 text-white p-4 rounded-full w-16 h-16 flex items-center justify-center">
+                <i data-feather="lock" class="w-8 h-8"></i>
+            </div>
+        </div>
+        
+        <!-- Card -->
+        <div class="bg-white rounded-xl shadow-md p-8">
+            <h1 class="text-2xl font-bold text-gray-800 text-center mb-2">Entrar</h1>
+            <p class="text-gray-500 text-center mb-6">Acesse sua conta para continuar</p>
+            
+            <!-- Form -->
+            <form id="loginForm">
+                <!-- Email Field -->
+                <div class="mb-4">
+                    <label for="email" class="block text-gray-700 text-sm font-medium mb-2">Email</label>
+                    <div class="relative">
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            autocomplete="email" 
+                            class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                            placeholder="seu@email.com"
+                            required
+                        >
+                        <div id="emailError" class="hidden absolute right-3 top-3 text-red-500">
+                            <i data-feather="alert-circle" class="w-5 h-5"></i>
+                        </div>
+                    </div>
+                    <p id="emailErrorMessage" class="hidden text-red-500 text-xs mt-1">Por favor, insira um email válido</p>
+                </div>
+                
+                <!-- Password Field -->
+                <div class="mb-6">
+                    <label for="password" class="block text-gray-700 text-sm font-medium mb-2">Senha</label>
+                    <input 
+                        type="password" 
+                        id="password" 
+                        name="password" 
+                        autocomplete="current-password" 
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
+                        placeholder="••••••••"
+                        required
+                    >
+                </div>
+                
+                <!-- Submit Button -->
+                <button 
+                    type="submit" 
+                    id="submitBtn"
+                    class="w-full bg-blue-500 hover:bg-blue-600 text-white font-medium py-4 px-4 rounded-lg ripple transition duration-150 flex items-center justify-center"
+                >
+                    <span id="buttonText">Entrar</span>
+                    <div id="loader" class="loader hidden"></div>
+                </button>
+            </form>
+            
+            <!-- Links -->
+            <div class="mt-6 text-center text-sm">
+                <a href="#" class="text-blue-500 hover:text-blue-600">Esqueci a senha</a>
+                <span class="mx-2 text-gray-400">•</span>
+                <a href="#" class="text-blue-500 hover:text-blue-600">Contato suporte</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize AOS and Feather Icons
+        AOS.init();
+        feather.replace();
+        
+        // Form Validation
+        const emailInput = document.getElementById('email');
+        const emailError = document.getElementById('emailError');
+        const emailErrorMessage = document.getElementById('emailErrorMessage');
+        const loginForm = document.getElementById('loginForm');
+        const submitBtn = document.getElementById('submitBtn');
+        const buttonText = document.getElementById('buttonText');
+        const loader = document.getElementById('loader');
+        
+        // Email validation
+        emailInput.addEventListener('input', function() {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailInput.value)) {
+                emailInput.classList.add('input-error');
+                emailError.classList.remove('hidden');
+                emailErrorMessage.classList.remove('hidden');
+            } else {
+                emailInput.classList.remove('input-error');
+                emailError.classList.add('hidden');
+                emailErrorMessage.classList.add('hidden');
+            }
+        });
+        
+        // Form submission
+        loginForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            // Show loader
+            buttonText.classList.add('hidden');
+            loader.classList.remove('hidden');
+            submitBtn.disabled = true;
+            
+            // Simulate API call
+            setTimeout(() => {
+                // Hide loader
+                buttonText.classList.remove('hidden');
+                loader.classList.add('hidden');
+                submitBtn.disabled = false;
+                
+                // Simulate success
+                submitBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+                submitBtn.classList.add('bg-green-500', 'hover:bg-green-600');
+                buttonText.textContent = 'Login realizado!';
+                
+                // Reset after 2 seconds
+                setTimeout(() => {
+                    submitBtn.classList.remove('bg-green-500', 'hover:bg-green-600');
+                    submitBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                    buttonText.textContent = 'Entrar';
+                }, 2000);
+            }, 1500);
+        });
+    </script>
+</body>
+</html>

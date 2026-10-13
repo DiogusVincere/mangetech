@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detalhe do Chamado | Sistema de Tickets</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .timeline-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            left: 18px;
+            top: 28px;
+            height: calc(100% - 28px);
+            width: 2px;
+            background: #e5e7eb;
+        }
+        .lightbox {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+        .lightbox-content {
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .lightbox-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: white;
+            font-size: 30px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Header -->
+    <header class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center">
+                        <h1 class="text-2xl font-bold text-gray-900 truncate">
+                            Problema com impressora no setor financeiro
+                        </h1>
+                        <span class="ml-3 px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                            Em andamento
+                        </span>
+                        <span class="ml-2 px-2 py-1 text-xs font-medium rounded-full bg-red-100 text-red-800">
+                            Alta prioridade
+                        </span>
+                    </div>
+                    <div class="mt-1 flex flex-col sm:flex-row sm:flex-wrap sm:mt-0 sm:space-x-6">
+                        <div class="mt-2 flex items-center text-sm text-gray-500">
+                            <i data-feather="hash" class="mr-1.5 h-4 w-4 text-gray-400"></i>
+                            #TKT-2023-0042
+                        </div>
+                        <div class="mt-2 flex items-center text-sm text-gray-500">
+                            <i data-feather="calendar" class="mr-1.5 h-4 w-4 text-gray-400"></i>
+                            Criado em 15/11/2023
+                        </div>
+                        <div class="mt-2 flex items-center text-sm text-gray-500">
+                            <i data-feather="clock" class="mr-1.5 h-4 w-4 text-gray-400"></i>
+                            Prazo: 20/11/2023
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-4 flex sm:mt-0 sm:ml-4 space-x-3">
+                    <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i data-feather="user" class="-ml-1 mr-2 h-4 w-4 text-gray-500"></i>
+                        Atribuir
+                    </button>
+                    <button type="button" onclick="openStatusModal()" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i data-feather="refresh-cw" class="-ml-1 mr-2 h-4 w-4"></i>
+                        Mudar status
+                    </button>
+                    <button type="button" class="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                        <i data-feather="download" class="-ml-1 mr-2 h-4 w-4 text-gray-500"></i>
+                        Exportar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Overdue Banner -->
+    <div class="bg-red-50 border-l-4 border-red-400 p-4">
+        <div class="flex">
+            <div class="flex-shrink-0">
+                <i data-feather="alert-triangle" class="h-5 w-5 text-red-400"></i>
+            </div>
+            <div class="ml-3">
+                <p class="text-sm text-red-700">
+                    Este chamado está atrasado! O prazo sugerido era <span class="font-medium">20/11/2023</span>.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div class="lg:grid lg:grid-cols-12 lg:gap-8">
+            <!-- Left Column (2/3) -->
+            <div class="lg:col-span-8 space-y-6">
+                <!-- Description -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Descrição do chamado
+                        </h3>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <p class="text-gray-700">
+                            A impressora do setor financeiro (HP LaserJet Pro M404dn) está apresentando problemas de alimentação de papel. 
+                            Quando tentamos imprimir documentos com mais de 10 páginas, o papel fica preso e a impressora para de funcionar.
+                            Já tentamos limpar os rolos e reiniciar o equipamento, mas o problema persiste. Necessário verificar os mecanismos internos de alimentação.
+                        </p>
+                    </div>
+                </section>
+
+                <!-- Attachments -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Anexos (3)
+                        </h3>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                            <div class="group relative">
+                                <img src="http://static.photos/technology/320x240/1" alt="Attachment 1" class="w-full h-32 object-cover rounded-md cursor-pointer" onclick="openLightbox('http://static.photos/technology/1200x630/1')">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition duration-150 rounded-md"></div>
+                            </div>
+                            <div class="group relative">
+                                <img src="http://static.photos/technology/320x240/2" alt="Attachment 2" class="w-full h-32 object-cover rounded-md cursor-pointer" onclick="openLightbox('http://static.photos/technology/1200x630/2')">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition duration-150 rounded-md"></div>
+                            </div>
+                            <div class="group relative">
+                                <img src="http://static.photos/technology/320x240/3" alt="Attachment 3" class="w-full h-32 object-cover rounded-md cursor-pointer" onclick="openLightbox('http://static.photos/technology/1200x630/3')">
+                                <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition duration-150 rounded-md"></div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Notes/Comments -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Comentários
+                            </h3>
+                            <button type="button" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                <i data-feather="plus" class="-ml-0.5 mr-1.5 h-4 w-4"></i>
+                                Adicionar comentário
+                            </button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6 space-y-4">
+                        <div class="flex">
+                            <div class="flex-shrink-0 mr-3">
+                                <img class="h-10 w-10 rounded-full" src="http://static.photos/people/200x200/1" alt="">
+                            </div>
+                            <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+                                <div class="bg-gray-50 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-sm font-medium text-gray-900">
+                                            Carlos Silva
+                                        </p>
+                                        <p class="text-sm text-gray-500">
+                                            15/11/2023 14:30
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="px-4 py-3">
+                                    <p class="text-sm text-gray-700">
+                                        Verifiquei o equipamento e realmente está com problemas na bandeja de alimentação. Vou precisar abrir a impressora para verificar os rolos internos.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex">
+                            <div class="flex-shrink-0 mr-3">
+                                <img class="h-10 w-10 rounded-full" src="http://static.photos/people/200x200/2" alt="">
+                            </div>
+                            <div class="flex-1 border border-gray-200 rounded-lg overflow-hidden">
+                                <div class="bg-gray-50 px-4 py-3">
+                                    <div class="flex items-center justify-between">
+                                        <p class="text-sm font-medium text-gray-900">
+                                            Ana Oliveira
+                                        </p>
+                                        <p class="text-sm text-gray-500">
+                                            16/11/2023 09:15
+                                        </p>
+                                    </div>
+                                </div>
+                                <div class="px-4 py-3">
+                                    <p class="text-sm text-gray-700">
+                                        Por favor, avise quando for realizar o reparo para que possamos organizar o trabalho do setor financeiro. Obrigada!
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Timeline -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg leading-6 font-medium text-gray-900">
+                                Histórico do chamado
+                            </h3>
+                            <button type="button" class="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                Ir para o último
+                            </button>
+                        </div>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <div class="flow-root">
+                            <ul class="-mb-8">
+                                <!-- Timeline Item -->
+                                <li class="relative pb-8 timeline-item">
+                                    <div class="relative flex items-start space-x-3">
+                                        <div class="flex-shrink-0 pt-1.5">
+                                            <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                <i data-feather="plus" class="h-4 w-4 text-blue-600"></i>
+                                            </div>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <div>
+                                                <div class="text-sm">
+                                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800">
+                                                        Aberto
+                                                    </span>
+                                                    <span class="ml-2 font-medium text-gray-900">Maria Souza</span>
+                                                </div>
+                                                <p class="mt-0.5 text-sm text-gray-500">
+                                                    Criado em 15/11/2023 10:30
+                                                </p>
+                                            </div>
+                                            <div class="mt-2 text-sm text-gray-700">
+                                                <p>Chamado aberto para resolver problema com impressora no setor financeiro.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+
+                                <!-- Timeline Item -->
+                                <li class="relative pb-8 timeline-item">
+                                    <div class="relative flex items-start space-x-3">
+                                        <div class="flex-shrink-0 pt-1.5">
+                                            <div class="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                                                <i data-feather="user" class="h-4 w-4 text-yellow-600"></i>
+                                            </div>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <div>
+                                                <div class="text-sm">
+                                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                                        Em andamento
+                                                    </span>
+                                                    <span class="ml-2 font-medium text-gray-900">Carlos Silva</span>
+                                                </div>
+                                                <p class="mt-0.5 text-sm text-gray-500">
+                                                    15/11/2023 14:30
+                                                </p>
+                                            </div>
+                                            <div class="mt-2 text-sm text-gray-700">
+                                                <p>Atribuído para minha equipe. Vou verificar o equipamento ainda hoje.</p>
+                                            </div>
+                                            <div class="mt-2 grid grid-cols-3 gap-2">
+                                                <img src="http://static.photos/technology/320x240/1" alt="Timeline image 1" class="w-full h-24 object-cover rounded-md cursor-pointer" onclick="openLightbox('http://static.photos/technology/1200x630/1')">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+
+                                <!-- Timeline Item -->
+                                <li class="relative pb-8 timeline-item">
+                                    <div class="relative flex items-start space-x-3">
+                                        <div class="flex-shrink-0 pt-1.5">
+                                            <div class="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                                <i data-feather="alert-circle" class="h-4 w-4 text-purple-600"></i>
+                                            </div>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <div>
+                                                <div class="text-sm">
+                                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-purple-100 text-purple-800">
+                                                        Aguardando peça
+                                                    </span>
+                                                    <span class="ml-2 font-medium text-gray-900">Carlos Silva</span>
+                                                </div>
+                                                <p class="mt-0.5 text-sm text-gray-500">
+                                                    16/11/2023 11:45
+                                                </p>
+                                            </div>
+                                            <div class="mt-2 text-sm text-gray-700">
+                                                <p>Identificado problema no mecanismo de alimentação. Necessário substituir o conjunto de rolos. Já solicitei a peça ao fornecedor, deve chegar em 2 dias.</p>
+                                            </div>
+                                            <div class="mt-2 grid grid-cols-3 gap-2">
+                                                <img src="http://static.photos/technology/320x240/2" alt="Timeline image 2" class="w-full h-24 object-cover rounded-md cursor-pointer" onclick="openLightbox('http://static.photos/technology/1200x630/2')">
+                                                <img src="http://static.photos/technology/320x240/3" alt="Timeline image 3" class="w-full h-24 object-cover rounded-md cursor-pointer" onclick="openLightbox('http://static.photos/technology/1200x630/3')">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+
+                                <!-- Timeline Item (Current) -->
+                                <li class="relative timeline-item">
+                                    <div class="relative flex items-start space-x-3">
+                                        <div class="flex-shrink-0 pt-1.5">
+                                            <div class="h-8 w-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                                                <i data-feather="refresh-cw" class="h-4 w-4 text-yellow-600"></i>
+                                            </div>
+                                        </div>
+                                        <div class="min-w-0 flex-1">
+                                            <div>
+                                                <div class="text-sm">
+                                                    <span class="px-2 py-1 text-xs font-medium rounded-full bg-yellow-100 text-yellow-800">
+                                                        Em andamento
+                                                    </span>
+                                                    <span class="ml-2 font-medium text-gray-900">Carlos Silva</span>
+                                                </div>
+                                                <p class="mt-0.5 text-sm text-gray-500">
+                                                    18/11/2023 09:20
+                                                </p>
+                                            </div>
+                                            <div class="mt-2 text-sm text-gray-700">
+                                                <p>Peça chegou. Vou realizar a substituição hoje pela manhã.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- Right Column (1/3) -->
+            <div class="mt-8 lg:mt-0 lg:col-span-4 space-y-6">
+                <!-- Meta Info -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Informações do chamado
+                        </h3>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <dl class="grid grid-cols-1 gap-x-4 gap-y-4">
+                            <div class="sm:col-span-1">
+                                <dt class="text-sm font-medium text-gray-500">
+                                    Solicitante
+                                </dt>
+                                <dd class="mt-1 text-sm text-gray-900 flex items-center">
+                                    <img class="h-6 w-6 rounded-full mr-2" src="http://static.photos/people/200x200/3" alt="">
+                                    Maria Souza
+                                </dd>
+                            </div>
+                            <div class="sm:col-span-1">
+                                <dt class="text-sm font-medium text-gray-500">
+                                    Criado em
+                                </dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    15/11/2023 10:30
+                                </dd>
+                            </div>
+                            <div class="sm:col-span-1">
+                                <dt class="text-sm font-medium text-gray-500">
+                                    Prazo sugerido
+                                </dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    20/11/2023
+                                </dd>
+                            </div>
+                            <div class="sm:col-span-1">
+                                <dt class="text-sm font-medium text-gray-500">
+                                    Ambiente
+                                </dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    Setor Financeiro - Sala 204
+                                </dd>
+                            </div>
+                            <div class="sm:col-span-1">
+                                <dt class="text-sm font-medium text-gray-500">
+                                    Ativo relacionado
+                                </dt>
+                                <dd class="mt-1 text-sm text-gray-900">
+                                    <a href="#" class="text-blue-600 hover:text-blue-800">HP LaserJet Pro M404dn (#AST-0042)</a>
+                                </dd>
+                            </div>
+                        </dl>
+                    </div>
+                </section>
+
+                <!-- Responsible Team -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Responsáveis
+                        </h3>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6">
+                        <ul class="space-y-4">
+                            <li class="flex items-center">
+                                <img class="h-10 w-10 rounded-full" src="http://static.photos/people/200x200/1" alt="">
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium text-gray-900">Carlos Silva</p>
+                                    <p class="text-sm text-gray-500">Técnico de TI</p>
+                                </div>
+                            </li>
+                            <li class="flex items-center">
+                                <img class="h-10 w-10 rounded-full" src="http://static.photos/people/200x200/4" alt="">
+                                <div class="ml-3">
+                                    <p class="text-sm font-medium text-gray-900">João Mendes</p>
+                                    <p class="text-sm text-gray-500">Assistente Técnico</p>
+                                </div>
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <!-- Quick Actions -->
+                <section class="bg-white shadow overflow-hidden sm:rounded-lg">
+                    <div class="px-4 py-5 sm:px-6 border-b border-gray-200">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900">
+                            Ações rápidas
+                        </h3>
+                    </div>
+                    <div class="px-4 py-5 sm:p-6 space-y-3">
+                        <button type="button" onclick="openStatusModal()" class="w-full flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i data-feather="refresh-cw" class="-ml-1 mr-2 h-4 w-4"></i>
+                            Mudar status
+                        </button>
+                        <button type="button" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i data-feather="edit" class="-ml-1 mr-2 h-4 w-4 text-gray-500"></i>
+                            Adicionar nota
+                        </button>
+                        <button type="button" class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i data-feather="plus" class="-ml-1 mr-2 h-4 w-4 text-gray-500"></i>
+                            Criar sub-tarefa
+                        </button>
+                    </div>
+                </section>
+
+                <!-- CTA for "Aguardando responsáveis" -->
+                <div id="awaiting-cta" class="bg-blue-50 border-l-4 border-blue-400 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <i data-feather="check-circle" class="h-5 w-5 text-blue-400"></i>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-blue-800">
+                                Analisar Pedido
+                            </h3>
+                            <div class="mt-2 text-sm text-blue-700">
+                                <p>Você é um dos responsáveis por este chamado. Por favor, analise e:</p>
+                                <ul class="list-disc pl-5 mt-2 space-y-1">
+                                    <li>Verifique se possui conhecimento para resolver</li>
+                                    <li>Confirme disponibilidade para atender no prazo</li>
+                                </ul>
+                            </div>
+                            <div class="mt-4">
+                                <div class="flex space-x-3">
+                                    <button type="button" class="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Aceitar chamado
+                                    </button>
+                                    <button type="button" class="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        Recusar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Status Change Modal -->
+    <div id="status-modal" class="fixed z-10 inset-0 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                <div>
+                    <div class="mt-3 text-center sm:mt-5">
+                        <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">
+                            Alterar status do chamado
+                        </h3>
+                        <div class="mt-4">
+                            <form class="space-y-6">
+                                <div>
+                                    <label for="new-status" class="block text-sm font-medium text-gray-700">Novo status</label>
+                                    <select id="new-status" name="new-status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                        <option value="">Selecione um status</option>
+                                        <option value="in_progress">Em andamento</option>
+                                        <option value="waiting_parts">Aguardando peça</option>
+                                        <option value="waiting_user">Aguardando usuário</option>
+                                        <option value="completed">Concluído</option>
+                                        <option value="canceled">Cancelado</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label for="description" class="block text-sm font-medium text-gray-700">Descrição <span class="text-red-500">*</span></label>
+                                    <div class="mt-1">
+                                        <textarea id="description" name="description" rows="3" class="shadow-sm focus:ring-blue-500 focus:border-blue-500 block w-full sm:text-sm border border-gray-300 rounded-md" placeholder="Descreva a mudança de status (mínimo 10 caracteres)"></textarea>
+                                    </div>
+                                    <p class="mt-2 text-sm text-gray-500">Este campo é obrigatório para registrar a mudança.</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Anexar fotos (opcional)</label>
+                                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+                                        <div class="space-y-1 text-center">
+                                            <div class="flex text-sm text-gray-600">
+                                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-blue-600 hover:text-blue-500 focus-within:outline-none">
+                                                    <span>Enviar arquivos</span>
+                                                    <input id="file-upload" name="file-upload" type="file" class="sr-only" multiple>
+                                                </label>
+                                                <p class="pl-1">ou arraste e solte</p>
+                                            </div>
+                                            <p class="text-xs text-gray-500">PNG, JPG, GIF até 10MB</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                    <button type="button" onclick="changeStatus()" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:col-start-2 sm:text-sm">
+                        Confirmar
+                    </button>
+                    <button type="button" onclick="closeStatusModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:col-start-1 sm:text-sm">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div id="lightbox" class="lightbox">
+        <span class="lightbox-close" onclick="closeLightbox()">&times;</span>
+        <img id="lightbox-img" class="lightbox-content" src="" alt="Lightbox Image">
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 hidden">
+        <div class="bg-green-500 text-white px-4 py-2 rounded-md shadow-lg flex items-center">
+            <i data-feather="check-circle" class="mr-2"></i>
+            <span>Status alterado com sucesso!</span>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Feather Icons
+        feather.replace();
+        
+        // Initialize AOS
+        AOS.init();
+
+        // Status Modal Functions
+        function openStatusModal() {
+            document.getElementById('status-modal').classList.remove('hidden');
+        }
+
+        function closeStatusModal() {
+            document.getElementById('status-modal').classList.add('hidden');
+        }
+
+        function changeStatus() {
+            const description = document.getElementById('description').value;
+            if (description.length < 10) {
+                alert('Por favor, insira uma descrição com pelo menos 10 caracteres.');
+                return;
+            }
+            
+            // Here you would typically make an API call to update the status
+            console.log('Status changed with description:', description);
+            
+            closeStatusModal();
+            showToast();
+        }
+
+        // Lightbox Functions
+        function openLightbox(imgSrc) {
+            document.getElementById('lightbox-img').src = imgSrc;
+            document.getElementById('lightbox').style.display = 'flex';
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').style.display = 'none';
+        }
+
+        // Toast Notification
+        function showToast() {
+            const toast = document.getElementById('toast');
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Hide "Aguardando responsáveis" CTA if status is not "Aguardando responsáveis"
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentStatus = 'Em andamento'; // This would come from your data
+            if (currentStatus !== 'Aguardando responsáveis') {
+                document.getElementById('awaiting-cta').style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

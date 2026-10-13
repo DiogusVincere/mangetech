@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Gerencial</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        .chart-container {
+            position: relative;
+            height: 100%;
+            width: 100%;
+        }
+        .tooltip {
+            position: absolute;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="min-h-screen">
+        <!-- Header -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                <h1 class="text-2xl font-bold text-gray-800">Dashboard Gerencial</h1>
+                <div class="flex space-x-4">
+                    <div class="relative">
+                        <select id="periodFilter" class="block appearance-none bg-white border border-gray-300 text-gray-700 py-2 px-4 pr-8 rounded leading-tight focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <option value="7">Últimos 7 dias</option>
+                            <option value="30" selected>Últimos 30 dias</option>
+                            <option value="90">Últimos 90 dias</option>
+                            <option value="custom">Personalizado</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                            <i data-feather="chevron-down"></i>
+                        </div>
+                    </div>
+                    <div class="flex space-x-2">
+                        <button id="exportPdf" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                            <i data-feather="download" class="mr-2"></i> PDF
+                        </button>
+                        <button id="exportCsv" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md flex items-center">
+                            <i data-feather="download" class="mr-2"></i> CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <!-- Total Chamados -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Total Chamados</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">1,248</h3>
+                            <p class="text-gray-500 text-sm mt-1">Últimos 30 dias</p>
+                        </div>
+                        <div class="bg-blue-100 p-3 rounded-full">
+                            <i data-feather="alert-circle" class="text-blue-600 w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex items-center text-sm text-gray-500">
+                            <span class="text-green-500 flex items-center">
+                                <i data-feather="trending-up" class="w-4 h-4 mr-1"></i> 12.5%
+                            </span>
+                            <span class="ml-2">vs período anterior</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLA Compliance -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">SLA Compliance</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">87%</h3>
+                            <p class="text-gray-500 text-sm mt-1">Meta: 90%</p>
+                        </div>
+                        <div class="bg-green-100 p-3 rounded-full">
+                            <i data-feather="check-circle" class="text-green-600 w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="w-full bg-gray-200 rounded-full h-2.5">
+                            <div class="bg-green-600 h-2.5 rounded-full" style="width: 87%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tempo Médio Resolução -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up" data-aos-delay="200">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Tempo Médio</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">4.2h</h3>
+                            <p class="text-gray-500 text-sm mt-1">Média de resolução</p>
+                        </div>
+                        <div class="bg-purple-100 p-3 rounded-full">
+                            <i data-feather="clock" class="text-purple-600 w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex items-center text-sm text-gray-500">
+                            <span class="text-red-500 flex items-center">
+                                <i data-feather="trending-down" class="w-4 h-4 mr-1"></i> 8.7%
+                            </span>
+                            <span class="ml-2">vs período anterior</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chamados Críticos -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up" data-aos-delay="300">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <p class="text-gray-500 text-sm font-medium">Críticos Abertos</p>
+                            <h3 class="text-3xl font-bold text-gray-800 mt-2">18</h3>
+                            <p class="text-gray-500 text-sm mt-1">Prioridade alta/crítico</p>
+                        </div>
+                        <div class="bg-red-100 p-3 rounded-full">
+                            <i data-feather="alert-triangle" class="text-red-600 w-6 h-6"></i>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <div class="flex items-center text-sm text-gray-500">
+                            <span class="text-red-500 flex items-center">
+                                <i data-feather="trending-up" class="w-4 h-4 mr-1"></i> 28.6%
+                            </span>
+                            <span class="ml-2">vs período anterior</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 1 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chamados por Status -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">Chamados por Status</h2>
+                        <div class="text-sm text-gray-500">Últimos 30 dias</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="statusChart" height="300"></canvas>
+                        <div class="tooltip" id="statusTooltip"></div>
+                    </div>
+                    <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-blue-500 rounded-full mr-2"></div>
+                            <span>Aberto (42%)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-yellow-500 rounded-full mr-2"></div>
+                            <span>Em Andamento (28%)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            <span>Resolvido (25%)</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                            <span>Cancelado (5%)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- SLA Compliance % -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">SLA Compliance %</h2>
+                        <div class="text-sm text-gray-500">Últimos 30 dias</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="slaChart" height="300"></canvas>
+                        <div class="tooltip" id="slaTooltip"></div>
+                    </div>
+                    <div class="mt-4 flex justify-between items-center text-sm">
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                            <span>Dentro do SLA</span>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-3 h-3 bg-red-500 rounded-full mr-2"></div>
+                            <span>Fora do SLA</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Row 2 -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <!-- Chamados por Ambiente -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">Chamados por Ambiente (Top 5)</h2>
+                        <div class="text-sm text-gray-500">Últimos 30 dias</div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="environmentChart" height="300"></canvas>
+                        <div class="tooltip" id="environmentTooltip"></div>
+                    </div>
+                </div>
+
+                <!-- Tempo para Resolver -->
+                <div class="bg-white rounded-lg shadow p-6" data-aos="fade-up" data-aos-delay="100">
+                    <div class="flex justify-between items-center mb-4">
+                        <h2 class="text-lg font-semibold text-gray-800">Tempo para Resolver (horas)</h2>
+                        <div class="text-sm text-gray-500">Últimos 30 dias</div>
+                    </div>
+                    <div class="flex mb-4">
+                        <div class="mr-6">
+                            <p class="text-gray-500 text-sm">Média</p>
+                            <p class="text-xl font-semibold">4.2h</p>
+                        </div>
+                        <div>
+                            <p class="text-gray-500 text-sm">Mediana</p>
+                            <p class="text-xl font-semibold">3.5h</p>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="timeChart" height="200"></canvas>
+                        <div class="tooltip" id="timeTooltip"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chamados Críticos Abertos -->
+            <div class="bg-white rounded-lg shadow overflow-hidden" data-aos="fade-up">
+                <div class="px-6 py-4 border-b border-gray-200">
+                    <h2 class="text-lg font-semibold text-gray-800">Chamados Críticos Abertos</h2>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Título</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Responsável</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ambiente</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Aberto há</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SLA</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1254</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Servidor de produção fora do ar</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">João Silva</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Produção</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2d 5h</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Crítico</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1248</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Vazamento de dados sensíveis</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Maria Souza</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Homologação</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1d 12h</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Crítico</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1239</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Aplicação indisponível para clientes</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Carlos Oliveira</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Produção</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">1d 3h</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Crítico</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1227</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Falha na integração com pagamentos</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Ana Costa</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Produção</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">18h</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Alta</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">#1215</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Backup não realizado</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Pedro Santos</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Desenvolvimento</td>
+                                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">12h</td>
+                                <td class="px-6 py-4 whitespace-nowrap">
+                                    <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-orange-100 text-orange-800">Alta</span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Initialize AOS
+        AOS.init({
+            duration: 800,
+            easing: 'ease-in-out',
+            once: true
+        });
+
+        // Initialize Feather Icons
+        feather.replace();
+
+        // Chart data
+        const statusData = {
+            labels: ['Aberto', 'Em Andamento', 'Resolvido', 'Cancelado'],
+            datasets: [{
+                data: [525, 350, 312, 62],
+                backgroundColor: [
+                    '#3B82F6', // blue
+                    '#F59E0B', // yellow
+                    '#10B981', // green
+                    '#EF4444'  // red
+                ],
+                borderWidth: 0
+            }]
+        };
+
+        const slaData = {
+            labels: ['Dentro do SLA', 'Fora do SLA'],
+            datasets: [{
+                data: [87, 13],
+                backgroundColor: [
+                    '#10B981', // green
+                    '#EF4444'  // red
+                ],
+                borderWidth: 0
+            }]
+        };
+
+        const environmentData = {
+            labels: ['Produção', 'Homologação', 'Desenvolvimento', 'Testes', 'Qualidade'],
+            datasets: [{
+                label: 'Chamados',
+                data: [420, 315, 280, 150, 83],
+                backgroundColor: [
+                    '#3B82F6',
+                    '#6366F1',
+                    '#8B5CF6',
+                    '#EC4899',
+                    '#F43F5E'
+                ],
+                borderWidth: 0
+            }]
+        };
+
+        const timeData = {
+            labels: ['<1h', '1-2h', '2-4h', '4-8h', '8-12h', '12-24h', '>24h'],
+            datasets: [{
+                label: 'Chamados',
+                data: [120, 210, 350, 280, 150, 90, 48],
+                backgroundColor: '#3B82F6',
+                borderWidth: 0
+            }]
+        };
+
+        function setupChartHover(chartId, chart, tooltipId) {
+            const chartElement = document.getElementById(chartId);
+            const tooltip = document.getElementById(tooltipId);
+
+            chartElement.addEventListener('mousemove', function(e) {
+                const activePoints = chart.getElementsAtEventForMode(e, 'nearest', { intersect: true }, false);
+                
+                if (activePoints.length > 0) {
+                    const firstPoint = activePoints[0];
+                    const dataset = chart.data.datasets[firstPoint.datasetIndex];
+                    const value = dataset.data[firstPoint.index];
+                    const label = chart.data.labels[firstPoint.index];
+                    
+                    tooltip.innerHTML = `${label}: ${value}`;
+                    tooltip.style.opacity = '1';
+                    tooltip.style.left = (e.offsetX + 10) + 'px';
+                    tooltip.style.top = (e.offsetY - 10) + 'px';
+                } else {
+                    tooltip.style.opacity = '0';
+                }
+            });
+
+            chartElement.addEventListener('mouseout', function() {
+                tooltip.style.opacity = '0';
+            });
+        }
+
+        function exportToPdf() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF('landscape');
+            
+            // Add title
+            doc.setFontSize(20);
+            doc.text('Dashboard Gerencial - Relatório', 15, 15);
+            
+            // Add date
+            const now = new Date();
+            doc.setFontSize(10);
+            doc.text(`Gerado em: ${now.toLocaleDateString()} ${now.toLocaleTimeString()}`, 15, 22);
+            
+            // Add filter info
+            const filter = document.getElementById('periodFilter').options[document.getElementById('periodFilter').selectedIndex].text;
+            doc.text(`Período: ${filter}`, 15, 28);
+            
+            // Add content (simplified for demo)
+            doc.setFontSize(12);
+            doc.text('Resumo dos Indicadores', 15, 40);
+            
+            // Add KPIs
+            doc.text('Total Chamados: 1,248', 15, 50);
+            doc.text('SLA Compliance: 87%', 15, 58);
+            doc.text('Tempo Médio Resolução: 4.2h', 15, 66);
+            doc.text('Chamados Críticos Abertos: 18', 15, 74);
+            
+            // Save the PDF
+            doc.save(`dashboard_gerencial_${now.getTime()}.pdf`);
+        }
+
+        function exportToCsv() {
+            const now = new Date();
+            const filter = document.getElementById('periodFilter').options[document.getElementById('periodFilter').selectedIndex].text;
+            
+            // CSV content (simplified for demo)
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Dashboard Gerencial - Relatório\n";
+            csvContent += `Gerado em,${now.toLocaleDateString()} ${now.toLocaleTimeString()}\n`;
+            csvContent += `Período,${filter}\n\n`;
+            csvContent += "Indicador,Valor\n";
+            csvContent += "Total Chamados,1248\n";
+            csvContent += "SLA Compliance,87%\n";
+            csvContent += "Tempo Médio Resolução,4.2h\n";
+            csvContent += "Chamados Críticos Abertos,18\n";
+            
+            // Create download link
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `dashboard_gerencial_${now.getTime()}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>

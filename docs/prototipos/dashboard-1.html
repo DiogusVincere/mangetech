@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Operacional</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'open': '#93C5FD',
+                        'waiting': '#FCD34D',
+                        'progress': '#F97316',
+                        'done': '#86EFAC',
+                        'completed': '#16A34A',
+                        'canceled': '#9CA3AF',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .status-badge {
+            @apply px-2 py-1 rounded-full text-xs font-medium;
+        }
+        .ticket-card:hover {
+            @apply shadow-lg transform -translate-y-0.5 transition-all duration-200;
+        }
+        .skeleton {
+            @apply bg-gray-200 animate-pulse rounded;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="flex flex-col min-h-screen">
+        <!-- Topbar -->
+        <header class="bg-white shadow-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <!-- Search -->
+                    <div class="flex-1 max-w-md">
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i data-feather="search" class="text-gray-400"></i>
+                            </div>
+                            <input 
+                                id="search" 
+                                type="text" 
+                                placeholder="Pesquisar chamados..." 
+                                class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                debounce="300"
+                            >
+                        </div>
+                    </div>
+                    
+                    <!-- Right side -->
+                    <div class="ml-4 flex items-center md:ml-6">
+                        <!-- Create Ticket Button -->
+                        <button class="ml-3 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                            <i data-feather="plus" class="mr-2"></i> Criar Chamado
+                        </button>
+                        
+                        <!-- Profile dropdown -->
+                        <div class="ml-3 relative">
+                            <div>
+                                <button id="user-menu" class="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                    <span class="sr-only">Abrir menu do usuário</span>
+                                    <img class="h-8 w-8 rounded-full" src="http://static.photos/people/200x200/42" alt="User avatar">
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="flex-1">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+                <!-- Filters -->
+                <div class="bg-white p-4 rounded-lg shadow mb-6">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <!-- Date Range Picker -->
+                        <div>
+                            <label for="date-range" class="block text-sm font-medium text-gray-700 mb-1">Período</label>
+                            <div class="relative">
+                                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <i data-feather="calendar" class="text-gray-400"></i>
+                                </div>
+                                <input type="text" id="date-range" class="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Selecione o período">
+                            </div>
+                        </div>
+                        
+                        <!-- Status Multi-select -->
+                        <div>
+                            <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                            <select id="status" multiple class="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="open">Aberto</option>
+                                <option value="waiting">Aguardando responsáveis</option>
+                                <option value="progress">Em andamento</option>
+                                <option value="done">Realizado</option>
+                                <option value="completed">Concluído</option>
+                                <option value="canceled">Cancelado</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Environment Select -->
+                        <div>
+                            <label for="environment" class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+                            <select id="environment" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
+                                <option value="">Todos</option>
+                                <option value="production">Produção</option>
+                                <option value="homologation">Homologação</option>
+                                <option value="development">Desenvolvimento</option>
+                            </select>
+                        </div>
+                        
+                        <!-- Asset Autocomplete -->
+                        <div>
+                            <label for="asset" class="block text-sm font-medium text-gray-700 mb-1">Ativo</label>
+                            <input type="text" id="asset" class="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="Digite o ativo">
+                        </div>
+                    </div>
+                    
+                    <!-- Active Filters Chips -->
+                    <div class="mt-4 flex flex-wrap gap-2">
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            Últimos 7 dias
+                            <button type="button" class="ml-1.5 inline-flex text-blue-500 hover:text-blue-700 focus:outline-none">
+                                <i data-feather="x" class="h-3 w-3"></i>
+                            </button>
+                        </span>
+                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Status: Aberto
+                            <button type="button" class="ml-1.5 inline-flex text-yellow-500 hover:text-yellow-700 focus:outline-none">
+                                <i data-feather="x" class="h-3 w-3"></i>
+                            </button>
+                        </span>
+                    </div>
+                </div>
+                
+                <!-- Main Grid -->
+                <div class="flex flex-col lg:flex-row gap-6">
+                    <!-- Left Column - Tickets List -->
+                    <div class="lg:w-2/3">
+                        <!-- Sorting and Bulk Actions -->
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="flex items-center space-x-4">
+                                <span class="text-sm text-gray-500">Ordenar por:</span>
+                                <div class="flex space-x-2">
+                                    <button class="px-3 py-1 text-sm bg-blue-100 text-blue-800 rounded-md">Mais recentes</button>
+                                    <button class="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Prazo</button>
+                                    <button class="px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-md">Urgência</button>
+                                </div>
+                            </div>
+                            <div class="flex items-center">
+                                <input id="select-all" type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded">
+                                <label for="select-all" class="ml-2 block text-sm text-gray-700">Selecionar todos</label>
+                                <button class="ml-4 text-sm text-gray-600 hover:text-gray-900">Ações em massa</button>
+                            </div>
+                        </div>
+                        
+                        <!-- Tickets List -->
+                        <div class="bg-white shadow rounded-lg overflow-hidden">
+                            <!-- Loading State -->
+                            <!-- <div class="space-y-4 p-4">
+                                <div class="skeleton h-20 w-full"></div>
+                                <div class="skeleton h-20 w-full"></div>
+                                <div class="skeleton h-20 w-full"></div>
+                                <div class="skeleton h-20 w-full"></div>
+                                <div class="skeleton h-20 w-full"></div>
+                                <div class="skeleton h-20 w-full"></div>
+                            </div> -->
+                            
+                            <!-- Empty State -->
+                            <!-- <div class="text-center py-12">
+                                <i data-feather="inbox" class="mx-auto h-12 w-12 text-gray-400"></i>
+                                <h3 class="mt-2 text-sm font-medium text-gray-900">Nenhum chamado encontrado</h3>
+                                <p class="mt-1 text-sm text-gray-500">Crie um novo chamado para começar.</p>
+                                <div class="mt-6">
+                                    <button class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+                                        <i data-feather="plus" class="mr-2"></i> Criar Chamado
+                                    </button>
+                                </div>
+                            </div> -->
+                            
+                            <!-- Tickets -->
+                            <div class="divide-y divide-gray-200">
+                                <!-- Ticket 1 -->
+                                <div class="ticket-card p-4 hover:bg-gray-50 transition-colors duration-150">
+                                    <div class="flex items-start">
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1">
+                                        <div class="ml-3 flex-1">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="status-badge bg-open text-blue-900">Aberto</span>
+                                                    <span class="text-sm font-medium text-gray-900">#INC-1234 - Problema com servidor de aplicação</span>
+                                                </div>
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                        Servidor-01
+                                                    </span>
+                                                    <i data-feather="alert-triangle" class="text-yellow-500"></i>
+                                                    <span class="text-xs text-gray-500">Vence em 2 dias</span>
+                                                </div>
+                                            </div>
+                                            <p class="mt-1 text-sm text-gray-600 truncate">O servidor de aplicação está apresentando lentidão nas requisições durante os picos de acesso...</p>
+                                            <div class="mt-2 flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <img class="h-6 w-6 rounded-full" src="http://static.photos/people/200x200/1" alt="User avatar">
+                                                    <span class="text-xs text-gray-500">João Silva</span>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button class="text-xs text-blue-600 hover:text-blue-800">Abrir</button>
+                                                    <button class="text-xs text-gray-500 hover:text-gray-700">
+                                                        <i data-feather="more-vertical" class="h-4 w-4"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Ticket 2 -->
+                                <div class="ticket-card p-4 hover:bg-gray-50 transition-colors duration-150">
+                                    <div class="flex items-start">
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1">
+                                        <div class="ml-3 flex-1">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="status-badge bg-progress text-orange-900">Em andamento</span>
+                                                    <span class="text-sm font-medium text-gray-900">#INC-1233 - Atualização de banco de dados</span>
+                                                </div>
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                        DB-02
+                                                    </span>
+                                                    <i data-feather="clock" class="text-blue-500"></i>
+                                                    <span class="text-xs text-gray-500">Vence em 5 dias</span>
+                                                </div>
+                                            </div>
+                                            <p class="mt-1 text-sm text-gray-600 truncate">Necessário atualizar a versão do banco de dados para corrigir vulnerabilidades de segurança...</p>
+                                            <div class="mt-2 flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <img class="h-6 w-6 rounded-full" src="http://static.photos/people/200x200/2" alt="User avatar">
+                                                    <img class="h-6 w-6 rounded-full" src="http://static.photos/people/200x200/3" alt="User avatar">
+                                                    <span class="text-xs text-gray-500">Maria Souza, Carlos Lima</span>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button class="text-xs text-blue-600 hover:text-blue-800">Abrir</button>
+                                                    <button class="text-xs text-gray-500 hover:text-gray-700">
+                                                        <i data-feather="more-vertical" class="h-4 w-4"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Ticket 3 -->
+                                <div class="ticket-card p-4 hover:bg-gray-50 transition-colors duration-150">
+                                    <div class="flex items-start">
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1">
+                                        <div class="ml-3 flex-1">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="status-badge bg-waiting text-yellow-900">Aguardando</span>
+                                                    <span class="text-sm font-medium text-gray-900">#INC-1232 - Configuração de firewall</span>
+                                                </div>
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                        FW-01
+                                                    </span>
+                                                    <i data-feather="alert-circle" class="text-red-500"></i>
+                                                    <span class="text-xs text-gray-500">Vence hoje</span>
+                                                </div>
+                                            </div>
+                                            <p class="mt-1 text-sm text-gray-600 truncate">Ajustar regras de firewall para permitir acesso ao novo sistema de relatórios...</p>
+                                            <div class="mt-2 flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <img class="h-6 w-6 rounded-full" src="http://static.photos/people/200x200/4" alt="User avatar">
+                                                    <span class="text-xs text-gray-500">Ana Oliveira</span>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button class="text-xs text-blue-600 hover:text-blue-800">Abrir</button>
+                                                    <button class="text-xs text-gray-500 hover:text-gray-700">
+                                                        <i data-feather="more-vertical" class="h-4 w-4"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Ticket 4 -->
+                                <div class="ticket-card p-4 hover:bg-gray-50 transition-colors duration-150">
+                                    <div class="flex items-start">
+                                        <input type="checkbox" class="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1">
+                                        <div class="ml-3 flex-1">
+                                            <div class="flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="status-badge bg-completed text-green-900">Concluído</span>
+                                                    <span class="text-sm font-medium text-gray-900">#INC-1231 - Migração de dados</span>
+                                                </div>
+                                                <div class="flex items-center space-x-2">
+                                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                        Storage-03
+                                                    </span>
+                                                    <i data-feather="check-circle" class="text-green-500"></i>
+                                                    <span class="text-xs text-gray-500">Concluído ontem</span>
+                                                </div>
+                                            </div>
+                                            <p class="mt-1 text-sm text-gray-600 truncate">Migração concluída com sucesso para o novo storage com capacidade expandida...</p>
+                                            <div class="mt-2 flex items-center justify-between">
+                                                <div class="flex items-center space-x-2">
+                                                    <img class="h-6 w-6 rounded-full" src="http://static.photos/people/200x200/5" alt="User avatar">
+                                                    <img class="h-6 w-6 rounded-full" src="http://static.photos/people/200x200/6" alt="User avatar">
+                                                    <span class="text-xs text-gray-500">Pedro Santos, Luiza Costa</span>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button class="text-xs text-blue-600 hover:text-blue-800">Abrir</button>
+                                                    <button class="text-xs text-gray-500 hover:text-gray-700">
+                                                        <i data-feather="more-vertical" class="h-4 w-4"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- Pagination -->
+                            <div class="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+                                <div class="flex-1 flex justify-between sm:hidden">
+                                    <a href="#" class="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                        Anterior
+                                    </a>
+                                    <a href="#" class="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50">
+                                        Próximo
+                                    </a>
+                                </div>
+                                <div class="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                                    <div>
+                                        <p class="text-sm text-gray-700">
+                                            Mostrando <span class="font-medium">1</span> a <span class="font-medium">4</span> de <span class="font-medium">24</span> resultados
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <nav class="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                                            <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                                <span class="sr-only">Anterior</span>
+                                                <i data-feather="chevron-left" class="h-5 w-5"></i>
+                                            </a>
+                                            <a href="#" aria-current="page" class="z-10 bg-blue-50 border-blue-500 text-blue-600 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                                1
+                                            </a>
+                                            <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                                2
+                                            </a>
+                                            <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                                3
+                                            </a>
+                                            <span class="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                                                ...
+                                            </span>
+                                            <a href="#" class="bg-white border-gray-300 text-gray-500 hover:bg-gray-50 relative inline-flex items-center px-4 py-2 border text-sm font-medium">
+                                                8
+                                            </a>
+                                            <a href="#" class="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">
+                                                <span class="sr-only">Próximo</span>
+                                                <i data-feather="chevron-right" class="h-5 w-5"></i>
+                                            </a>
+                                        </nav>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Right Column - KPIs -->
+                    <div class="lg:w-1/3 space-y-6">
+                        <!-- Assigned to Me -->
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Atribuídos a mim</h3>
+                            <div class="space-y-4">
+                                <div class="flex items-start">
+                                    <span class="status-badge bg-progress text-orange-900 mt-1">Em andamento</span>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium text-gray-900">#INC-1233 - Atualização de banco</p>
+                                        <p class="text-xs text-gray-500 truncate">Vence em 5 dias</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start">
+                                    <span class="status-badge bg-waiting text-yellow-900 mt-1">Aguardando</span>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium text-gray-900">#INC-1232 - Configuração FW</p>
+                                        <p class="text-xs text-gray-500 truncate">Vence hoje</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- KPIs -->
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Métricas</h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div class="bg-blue-50 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-gray-500">Abertos</p>
+                                    <p class="text-2xl font-bold text-blue-600">12</p>
+                                </div>
+                                <div class="bg-red-50 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-gray-500">Em atraso</p>
+                                    <p class="text-2xl font-bold text-red-600">3</p>
+                                </div>
+                                <div class="bg-green-50 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-gray-500">Eficiência</p>
+                                    <p class="text-2xl font-bold text-green-600">87%</p>
+                                </div>
+                                <div class="bg-yellow-50 p-3 rounded-lg">
+                                    <p class="text-sm font-medium text-gray-500">Próximos SLA</p>
+                                    <p class="text-2xl font-bold text-yellow-600">5</p>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Recent Tickets -->
+                        <div class="bg-white p-4 rounded-lg shadow">
+                            <h3 class="text-lg font-medium text-gray-900 mb-4">Recentes</h3>
+                            <div class="space-y-3">
+                                <div class="flex items-start">
+                                    <span class="status-badge bg-open text-blue-900 mt-1">Aberto</span>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium text-gray-900">#INC-1235 - Backup falhando</p>
+                                        <p class="text-xs text-gray-500">Há 2 horas</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start">
+                                    <span class="status-badge bg-open text-blue-900 mt-1">Aberto</span>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium text-gray-900">#INC-1236 - Acesso negado</p>
+                                        <p class="text-xs text-gray-500">Há 4 horas</p>
+                                    </div>
+                                </div>
+                                <div class="flex items-start">
+                                    <span class="status-badge bg-done text-green-900 mt-1">Realizado</span>
+                                    <div class="ml-3">
+                                        <p class="text-sm font-medium text-gray-900">#INC-1230 - Monitoramento</p>
+                                        <p class="text-xs text-gray-500">Ontem</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        AOS.init();
+        feather.replace();
+        
+        // Debounce search function
+        function debounce(func, timeout = 300){
+            let timer;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => { func.apply(this, args); }, timeout);
+            };
+        }
+        
+        document.getElementById('search').addEventListener('input', debounce(function(e) {
+            console.log('Searching for:', e.target.value);
+            // Implement search functionality here
+        }));
+    </script>
+</body>
+</html>

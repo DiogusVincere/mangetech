@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Criar Chamado</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <style>
+        .upload-area {
+            transition: all 0.3s ease;
+        }
+        .upload-area.drag-over {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+        }
+        .progress-bar {
+            transition: width 0.3s ease;
+        }
+        .error-message {
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        .error-message.show {
+            opacity: 1;
+        }
+        .toast {
+            animation: slideIn 0.5s forwards, fadeOut 0.5s 3s forwards;
+        }
+        @keyframes slideIn {
+            from { transform: translateY(100px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="max-w-4xl mx-auto p-6">
+        <div class="flex items-center mb-8">
+            <a href="#" class="text-indigo-600 hover:text-indigo-800">
+                <i data-feather="arrow-left" class="mr-2"></i>
+            </a>
+            <h1 class="text-2xl font-bold text-gray-800">Criar Novo Chamado</h1>
+        </div>
+
+        <form id="chamadoForm" class="space-y-6">
+            <!-- Título -->
+            <div>
+                <label for="titulo" class="block text-sm font-medium text-gray-700 mb-1">Título*</label>
+                <input type="text" id="titulo" name="titulo" minlength="5" required
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Descreva brevemente o problema">
+                <div id="titulo-error" class="error-message text-sm text-red-600 mt-1">O título deve ter pelo menos 5 caracteres</div>
+            </div>
+
+            <!-- Ativo -->
+            <div>
+                <label for="ativo" class="block text-sm font-medium text-gray-700 mb-1">Ativo*</label>
+                <div class="relative">
+                    <input type="text" id="ativo" name="ativo" required
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                        placeholder="Busque por nome ou QR tag">
+                    <div id="ativo-results" class="hidden absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto"></div>
+                </div>
+                <div id="ativo-error" class="error-message text-sm text-red-600 mt-1">Selecione um ativo</div>
+            </div>
+
+            <!-- Ambiente -->
+            <div>
+                <label for="ambiente" class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+                <input type="text" id="ambiente" name="ambiente"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Localização do ativo">
+            </div>
+
+            <!-- Descrição -->
+            <div>
+                <label for="descricao" class="block text-sm font-medium text-gray-700 mb-1">Descrição*</label>
+                <textarea id="descricao" name="descricao" minlength="15" required rows="5"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Descreva detalhadamente o problema (mínimo 15 caracteres)"></textarea>
+                <div id="descricao-error" class="error-message text-sm text-red-600 mt-1">A descrição deve ter pelo menos 15 caracteres</div>
+            </div>
+
+            <!-- Upload de Arquivos -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Fotos/Anexos (opcional)</label>
+                <div id="upload-area" class="upload-area border-2 border-dashed border-gray-300 rounded-md p-6 text-center cursor-pointer hover:border-indigo-300 transition-colors">
+                    <div class="flex flex-col items-center justify-center space-y-2">
+                        <i data-feather="upload" class="w-10 h-10 text-gray-400"></i>
+                        <p class="text-sm text-gray-600">Arraste e solte arquivos aqui ou</p>
+                        <button type="button" id="select-files" class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
+                            Selecione arquivos
+                        </button>
+                        <p class="text-xs text-gray-500">Formatos permitidos: JPG, JPEG, PNG, PDF (máx. 5 arquivos, 2MB cada)</p>
+                    </div>
+                    <input type="file" id="file-input" class="hidden" multiple accept=".jpg,.jpeg,.png,.pdf">
+                </div>
+
+                <div id="file-previews" class="mt-4 space-y-3"></div>
+            </div>
+
+            <!-- Data Sugerida -->
+            <div>
+                <label for="data-resolucao" class="block text-sm font-medium text-gray-700 mb-1">Data Sugerida de Resolução</label>
+                <input type="datetime-local" id="data-resolucao" name="data-resolucao"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500">
+            </div>
+
+            <!-- Urgência -->
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Nível de Urgência*</label>
+                <div class="grid grid-cols-4 gap-2">
+                    <label class="flex items-center justify-center p-2 border rounded-md cursor-pointer hover:bg-gray-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="urgencia" value="baixo" class="hidden" required>
+                        <span class="text-sm">Baixo</span>
+                    </label>
+                    <label class="flex items-center justify-center p-2 border rounded-md cursor-pointer hover:bg-gray-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="urgencia" value="medio" class="hidden">
+                        <span class="text-sm">Médio</span>
+                    </label>
+                    <label class="flex items-center justify-center p-2 border rounded-md cursor-pointer hover:bg-gray-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="urgencia" value="alto" class="hidden">
+                        <span class="text-sm">Alto</span>
+                    </label>
+                    <label class="flex items-center justify-center p-2 border rounded-md cursor-pointer hover:bg-gray-50 has-[:checked]:border-indigo-500 has-[:checked]:bg-indigo-50">
+                        <input type="radio" name="urgencia" value="critico" class="hidden">
+                        <span class="text-sm">Crítico</span>
+                    </label>
+                </div>
+                <div id="urgencia-error" class="error-message text-sm text-red-600 mt-1">Selecione um nível de urgência</div>
+            </div>
+
+            <!-- Responsáveis -->
+            <div>
+                <label for="responsaveis" class="block text-sm font-medium text-gray-700 mb-1">Responsáveis</label>
+                <div class="relative">
+                    <select id="responsaveis" name="responsaveis[]" multiple
+                        class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500 hidden-select">
+                        <option value="1" data-avatar="http://static.photos/people/200x200/1">João Silva</option>
+                        <option value="2" data-avatar="http://static.photos/people/200x200/2">Maria Souza</option>
+                        <option value="3" data-avatar="http://static.photos/people/200x200/3">Carlos Oliveira</option>
+                        <option value="4" data-avatar="http://static.photos/people/200x200/4">Ana Santos</option>
+                    </select>
+                    <div id="selected-responsaveis" class="flex flex-wrap gap-2 mt-2"></div>
+                </div>
+            </div>
+
+            <!-- Tags -->
+            <div>
+                <label for="tags" class="block text-sm font-medium text-gray-700 mb-1">Tags/Categoria</label>
+                <input type="text" id="tags" name="tags"
+                    class="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-indigo-500 focus:border-indigo-500"
+                    placeholder="Adicione tags separadas por vírgula">
+            </div>
+
+            <!-- Botões -->
+            <div class="flex justify-end space-x-4 pt-6">
+                <button type="button" id="cancelar" class="px-6 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
+                    Cancelar
+                </button>
+                <button type="submit" id="criar-chamado" class="px-6 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed">
+                    Criar Chamado
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-4 right-4 hidden">
+        <div class="toast bg-green-500 text-white px-6 py-3 rounded-md shadow-lg flex items-center">
+            <i data-feather="check-circle" class="mr-2"></i>
+            <span>Chamado criado com sucesso!</span>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            feather.replace();
+            AOS.init();
+
+            // Form validation
+            const form = document.getElementById('chamadoForm');
+            const requiredFields = ['titulo', 'ativo', 'descricao', 'urgencia'];
+            const fileInput = document.getElementById('file-input');
+            const uploadArea = document.getElementById('upload-area');
+            const filePreviews = document.getElementById('file-previews');
+            const selectedResponsaveis = document.getElementById('selected-responsaveis');
+            const respons
+</body>
+</html>

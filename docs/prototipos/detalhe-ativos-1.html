@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestão de Ativos</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/feather-icons/dist/feather.min.js"></script>
+    <script src="https://unpkg.com/feather-icons"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+    <style>
+        .qr-scanner {
+            position: relative;
+            width: 100%;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+        .qr-scanner-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background-color: rgba(0, 0, 0, 0.3);
+        }
+        .qr-scanner-guide {
+            width: 70%;
+            height: 70%;
+            border: 2px solid white;
+            position: relative;
+        }
+        .asset-image {
+            height: 200px;
+            object-fit: contain;
+            background-color: #f3f4f6;
+        }
+        .ticket-badge {
+            transition: all 0.2s ease;
+        }
+        .ticket-badge:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        .status-active {
+            background-color: #dcfce7;
+            color: #166534;
+        }
+        .status-inactive {
+            background-color: #fee2e2;
+            color: #991b1b;
+        }
+        .status-maintenance {
+            background-color: #fef3c7;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <!-- Navigation -->
+    <nav class="bg-white shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <i data-feather="package" class="text-blue-600 mr-2"></i>
+                    <span class="text-xl font-semibold text-gray-900">Gestão de Ativos</span>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="qrScannerBtn" class="flex items-center px-3 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition">
+                        <i data-feather="maximize" class="mr-2"></i>
+                        Scanner QR
+                    </button>
+                    <button class="flex items-center px-3 py-2 rounded-md bg-gray-100 text-gray-700 hover:bg-gray-200 transition">
+                        <i data-feather="user" class="mr-2"></i>
+                        Perfil
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <!-- Filters -->
+        <div class="bg-white rounded-lg shadow-sm p-6 mb-6">
+            <div class="flex flex-col md:flex-row md:items-end md:space-x-4 space-y-4 md:space-y-0">
+                <div class="flex-1">
+                    <label for="search" class="block text-sm font-medium text-gray-700 mb-1">Pesquisa</label>
+                    <div class="relative">
+                        <input type="text" id="search" placeholder="Buscar ativos..." class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <i data-feather="search" class="absolute left-3 top-2.5 text-gray-400"></i>
+                    </div>
+                </div>
+                <div>
+                    <label for="environment" class="block text-sm font-medium text-gray-700 mb-1">Ambiente</label>
+                    <select id="environment" class="w-full md:w-40 pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Todos</option>
+                        <option value="production">Produção</option>
+                        <option value="development">Desenvolvimento</option>
+                        <option value="testing">Testes</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="status" class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="status" class="w-full md:w-40 pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Todos</option>
+                        <option value="active">Ativo</option>
+                        <option value="inactive">Inativo</option>
+                        <option value="maintenance">Manutenção</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="manufacturer" class="block text-sm font-medium text-gray-700 mb-1">Fabricante</label>
+                    <select id="manufacturer" class="w-full md:w-40 pl-3 pr-10 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500">
+                        <option value="">Todos</option>
+                        <option value="dell">Dell</option>
+                        <option value="hp">HP</option>
+                        <option value="lenovo">Lenovo</option>
+                    </select>
+                </div>
+                <button class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition flex items-center">
+                    <i data-feather="filter" class="mr-2"></i>
+                    Filtrar
+                </button>
+            </div>
+        </div>
+
+        <!-- Asset List -->
+        <div class="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tag QR</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nome</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ambiente</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Último Chamado</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 bg-white p-1 rounded border">
+                                        <div id="qr-1"></div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">AST-001</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Servidor Dell R740</div>
+                                <div class="text-sm text-gray-500">Dell PowerEdge</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Produção</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge status-active">Ativo</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <a href="#" class="ticket-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                    CHM-2023-045
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button class="text-blue-600 hover:text-blue-900 mr-3 view-asset" data-id="1">
+                                    <i data-feather="eye"></i>
+                                </button>
+                                <button class="text-indigo-600 hover:text-indigo-900 edit-asset" data-id="1">
+                                    <i data-feather="edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 bg-white p-1 rounded border">
+                                        <div id="qr-2"></div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">AST-002</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Switch Cisco 2960X</div>
+                                <div class="text-sm text-gray-500">Cisco Catalyst</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">Testes</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge status-maintenance">Manutenção</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <a href="#" class="ticket-badge inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                    CHM-2023-112
+                                </a>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button class="text-blue-600 hover:text-blue-900 mr-3 view-asset" data-id="2">
+                                    <i data-feather="eye"></i>
+                                </button>
+                                <button class="text-indigo-600 hover:text-indigo-900 edit-asset" data-id="2">
+                                    <i data-feather="edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-gray-50 transition">
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="flex items-center">
+                                    <div class="flex-shrink-0 h-10 w-10 bg-white p-1 rounded border">
+                                        <div id="qr-3"></div>
+                                    </div>
+                                    <div class="ml-4">
+                                        <div class="text-sm font-medium text-gray-900">AST-003</div>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm font-medium text-gray-900">Notebook Lenovo T490</div>
+                                <div class="text-sm text-gray-500">Lenovo ThinkPad</div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">Desenvolvimento</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="status-badge status-inactive">Inativo</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <span class="text-sm text-gray-500">Nenhum</span>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                <button class="text-blue-600 hover:text-blue-900 mr-3 view-asset" data-id="3">
+                                    <i data-feather="eye"></i>
+                                </button>
+                                <button class="text-indigo-600 hover:text-indigo-900 edit-asset" data-id="3">
+                                    <i data-feather="edit"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Asset Detail Modal -->
+    <div id="assetModal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Detalhes do Ativo</h3>
+                                <button type="button" class="close-modal bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                    <i data-feather="x"></i>
+                                </button>
+                            </div>
+                            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div class="col-span-1">
+                                    <div class="asset-image w-full rounded-lg mb-4 flex items-center justify-center">
+                                        <img id="assetImage" src="http://static.photos/technology/640x360/1" alt="Asset Image" class="max-h-full max-w-full">
+                                    </div>
+                                    <div class="flex justify-center mb-4">
+                                        <div id="assetQrCode" class="p-2 bg-white rounded border"></div>
+                                    </div>
+                                    <div class="flex justify-center space-x-3">
+                                        <button id="openInAppBtn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition flex items-center">
+                                            <i data-feather="smartphone" class="mr-2"></i>
+                                            Abrir no app
+                                        </button>
+                                        <button id="copyIdBtn" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition flex items-center">
+                                            <i data-feather="copy" class="mr-2"></i>
+                                            Copiar ID
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="col-span-2">
+                                    <div class="mb-6">
+                                        <h4 class="text-lg font-medium text-gray-900 mb-3">Informações Técnicas</h4>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            <div>
+                                                <p class="text-sm text-gray-500">Nome</p>
+                                                <p id="assetName" class="font-medium">Servidor Dell R740</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Tag QR</p>
+                                                <p id="assetTag" class="font-medium">AST-001</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Modelo</p>
+                                                <p id="assetModel" class="font-medium">PowerEdge R740</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Serial</p>
+                                                <p id="assetSerial" class="font-medium">CN74839283</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Fabricante</p>
+                                                <p id="assetManufacturer" class="font-medium">Dell</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Fornecedor</p>
+                                                <p id="assetSupplier" class="font-medium">ABC Distribuidora</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Ambiente</p>
+                                                <p id="assetEnvironment" class="font-medium">Produção</p>
+                                            </div>
+                                            <div>
+                                                <p class="text-sm text-gray-500">Status</p>
+                                                <p id="assetStatus" class="font-medium"><span class="status-badge status-active">Ativo</span></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="mb-6">
+                                        <div class="flex justify-between items-center mb-3">
+                                            <h4 class="text-lg font-medium text-gray-900">Chamados Relacionados</h4>
+                                            <button id="viewTicketsBtn" class="px-3 py-1 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition flex items-center text-sm">
+                                                <i data-feather="list" class="mr-2"></i>
+                                                Ver Chamados
+                                            </button>
+                                        </div>
+                                        <div class="bg-gray-50 rounded-lg p-4">
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div class="bg-white p-3 rounded shadow-sm">
+                                                    <div class="flex items-center justify-between mb-2">
+                                                        <span class="text-sm font-medium text-gray-700">Total de Chamados</span>
+                                                        <span class="px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">3</span>
+                                                    </div>
+                                                    <div class="h-2 bg-gray-200 rounded-full">
+                                                        <div class="h-2 bg-blue-600 rounded-full" style="width: 60%"></div>
+                                                    </div>
+                                                </div>
+                                                <div class="bg-white p-3 rounded shadow-sm">
+                                                    <div class="flex items-center justify-between mb-2">
+                                                        <span class="text-sm font-medium text-gray-700">Em Aberto</span>
+                                                        <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded-full text-xs font-medium">1</span>
+                                                    </div>
+                                                    <div class="h-2 bg-gray-200 rounded-full">
+                                                        <div class="h-2 bg-yellow-500 rounded-full" style="width: 33%"></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="mt-4 space-y-2">
+                                                <a href="#" class="block p-2 bg-white rounded hover:bg-gray-100 transition">
+                                                    <div class="flex justify-between items-center">
+                                                        <span class="text-sm font-medium">CHM-2023-045</span>
+                                                        <span class="px-2 py-0.5 bg-green-100 text-green-800 rounded-full text-xs">Resolvido</span>
+                                                    </div>
+                                                    <p class="text-xs text-gray-500 mt-1">Problema com rede - 15/05/2023</p>
+                                                </a>
+                                                <a href="#" class="block p-2 bg-white rounded hover:bg-gray-100 transition">
+                                                    <div class="flex justify-between items-center">
+                                                        <span class="text-sm font-medium">CHM-2023-112</span>
+                                                        <span class="px-2 py-0.5 bg-yellow-100 text-yellow-800 rounded-full text-xs">Em Andamento</span>
+                                                    </div>
+                                                    <p class="text-xs text-gray-500 mt-1">Atualização de firmware - 02/08/2023</p>
+                                                </a>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div>
+                                        <h4 class="text-lg font-medium text-gray-900 mb-3">Histórico de Movimentações</h4>
+                                        <div class="bg-gray-50 rounded-lg p-4">
+                                            <div class="space-y-4">
+                                                <div class="flex">
+                                                    <div class="flex-shrink-0">
+                                                        <div class="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                            <i data-feather="check" class="text-blue-600 h-4 w-4"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ml-3">
+                                                        <p class="text-sm font-medium text-gray-900">Ativo cadastrado</p>
+                                                        <p class="text-sm text-gray-500">Por: João Silva • 10/01/2022</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex">
+                                                    <div class="flex-shrink-0">
+                                                        <div class="h-8 w-8 rounded-full bg-green-100 flex items-center justify-center">
+                                                            <i data-feather="refresh-cw" class="text-green-600 h-4 w-4"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ml-3">
+                                                        <p class="text-sm font-medium text-gray-900">Movido para Produção</p>
+                                                        <p class="text-sm text-gray-500">Por: Maria Souza • 15/02/2022</p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex">
+                                                    <div class="flex-shrink-0">
+                                                        <div class="h-8 w-8 rounded-full bg-purple-100 flex items-center justify-center">
+                                                            <i data-feather="tool" class="text-purple-600 h-4 w-4"></i>
+                                                        </div>
+                                                    </div>
+                                                    <div class="ml-3">
+                                                        <p class="text-sm font-medium text-gray-900">Manutenção preventiva</p>
+                                                        <p class="text-sm text-gray-500">Por: Carlos Oliveira • 20/06/2022</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- QR Scanner Modal -->
+    <div id="qrScannerModal" class="fixed inset-0 z-50 overflow-y-auto hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true"></div>
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div class="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+                <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                    <div class="sm:flex sm:items-start">
+                        <div class="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                            <div class="flex justify-between items-start">
+                                <h3 class="text-lg leading-6 font-medium text-gray-900" id="modal-title">Scanner QR Code</h3>
+                                <button type="button" class="close-qr-modal bg-white rounded-md text-gray-400 hover:text-gray-500 focus:outline-none">
+                                    <i data-feather="x"></i>
+                                </button>
+                            </div>
+                            <div class="mt-4">
+                                <div class="qr-scanner">
+                                    <video id="qr-video" width="100%" playsinline></video>
+                                    <div class="qr-scanner-overlay">
+                                        <div class="qr-scanner-guide"></div>
+                                        <p class="text-white mt-4 text-sm">Posicione o QR code dentro da área destacada</p>
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <p class="text-sm text-gray-500 text-center">Ou insira manualmente o código do ativo:</p>
+                                    <div class="mt-2 flex">
+                                        <input type="text" id="manualQrInput" placeholder="Ex: AST-001" class="flex-1 px-3 py-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500">
+                                        <button id="manualQrSubmit" class="px-4 py-2 bg-blue-600 text-white rounded-r-md hover:bg-blue-700 transition">
+                                            Buscar
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="button" class="close-qr-modal mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize AOS and Feather Icons
+        document.addEventListener('DOMContentLoaded', function() {
+            AOS.init();
+            feather.replace();
+            
+            // Generate QR codes for assets
+            const qr1 = qrcode(0, 'L');
+            qr1.addData('AST-001');
+            qr1.make();
+            document.getElementById('qr-1').innerHTML = qr1.createImgTag(2);
+            
+            const qr2 = qrcode(0, 'L');
+            qr2.addData('AST-002');
+            qr2.make();
+            document.getElementById('qr-2').innerHTML = qr2.createImgTag(2);
+            
+            const qr3 = qrcode(0, 'L');
+            qr3.addData('AST-003');
+            qr3.make();
+            document.getElementById('qr-3').innerHTML = qr3.createImgTag(2);
+            
+            // Modal controls
+            const viewButtons = document.querySelectorAll('.view-asset');
+            const assetModal = document.getElementById('assetModal');
+            const closeModalButtons = document.querySelectorAll('.close-modal');
+            
+            viewButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    const assetId = this.getAttribute('data-id');
+                    // In a real app, you would fetch asset details from API here
+                    // For demo, we're just showing the modal with sample data
+                    
+                    // Generate QR code for modal
+                    const modalQr = qrcode(0, 'L');
+                    modalQr.addData(`AST-00${assetId}`);
+                    modalQr.make();
+                    document.getElementById('assetQrCode').innerHTML = modalQr.createImgTag(4);
+                    
+                    assetModal.classList.remove('hidden');
+                });
+            });
+            
+            closeModalButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    assetModal.classList.add('hidden');
+                });
+            });
+            
+            // QR Scanner controls
+            const qrScannerBtn = document.getElementById('qrScannerBtn');
+            const qrScannerModal = document.getElementById('qrScannerModal');
+            const closeQrModalButtons = document.querySelectorAll('.close-qr-modal');
+            
+            qrScannerBtn.addEventListener('click', function() {
+                qrScannerModal.classList.remove('hidden');
+                startScanner();
+            });
+            
+            closeQrModalButtons.forEach(button => {
+                button.addEventListener('click', function() {
+                    qrScannerModal.classList.add('hidden');
+                    stopScanner();
+                });
+            });
+            
+            // Manual QR input
+            document.getElementById('manualQrSubmit').addEventListener('click', function() {
+                const qrValue = document.getElementById('manualQrInput').value;
+                if (qrValue) {
+                    // In a real app, you would call API to get asset by QR code
+                    console.log(`Searching for asset with QR: ${qrValue}`);
+                    // For demo, we'll just open the modal with asset 1
+                    const modalQr = qrcode(0, 'L');
+                    modalQr.addData(qrValue);
+                    modalQr.make();
+                    document.getElementById('assetQrCode').innerHTML = modalQr.createImgTag(4);
+                    
+                    qrScannerModal.classList.add('hidden');
+                    assetModal.classList.remove('hidden');
+                    stopScanner();
+                }
+            });
+            
+            // View tickets button
+            document.getElementById('viewTicketsBtn').addEventListener('click', function() {
+                // In a real app, this would redirect to tickets page filtered by asset
+                alert('Redirecionando para lista de chamados filtrada por este ativo');
+            });
+            
+            // Open in app button
+            document.getElementById('openInAppBtn').addEventListener('click', function() {
+                // In a real app, this would open a deep link to your mobile app
+                alert('Abrindo no aplicativo móvel...');
+            });
+            
+            // Copy ID button
+            document.getElementById('copyIdBtn').addEventListener('click', function() {
+                const assetTag = document.getElementById('assetTag').textContent;
+                navigator.clipboard.writeText(assetTag);
+                alert(`Tag ${assetTag} copiada para a área de transferência!`);
+            });
+            
+            // QR Scanner functionality
+            let scannerActive = false;
+            const video = document.getElementById('qr-video');
+            
+            function startScanner() {
+                if (scannerActive) return;
+                
+                navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                    .then(function(stream) {
+                        video.srcObject = stream;
+                        video.setAttribute("playsinline", true);
+                        video.play();
+                        scannerActive = true;
+                        requestAnimationFrame(tick);
+                    })
+                    .catch(function(err) {
+                        console.error("Error accessing camera: ", err);
+                        alert("Não foi possível acessar a câmera. Verifique as permissões.");
+                    });
+            }
+            
+            function stopScanner() {
+                if (!scannerActive) return;
+                
+                const stream = video.srcObject;
+                const tracks = stream.getTracks();
+                
+                tracks.forEach(function(track) {
+                    track.stop();
+                });
+                
+                video.srcObject = null;
+                scannerActive = false;
+            }
+            
+            function tick() {
+                if (!scannerActive) return;
+                
+                if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                    const canvas = document.createElement("canvas");
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                        inversionAttempts: "dontInvert",
+                    });
+                    
+                    if (code) {
+                        // QR code detected
+                        console.log("QR Code detected:", code.data);
+                        
+                        // In a real app, you would call your API here
+                        // For demo, we'll just show the modal
+                        const modalQr = qrcode(0, 'L');
+                        modalQr.addData(code.data);
+                        modalQr.make();
+                        document.getElementById('assetQrCode').innerHTML = modalQr.createImgTag(4);
+                        
+                        // Play sound and vibrate (if on mobile)
+                        if (navigator.vibrate) {
+                            navigator.vibrate(200);
+                        }
+                        
+                        // Close scanner and open asset modal
+                        qrScannerModal.classList.add('hidden');
+                        assetModal.classList.remove('hidden');
+                        stopScanner();
+                    }
+                }
+                
+                requestAnimationFrame(tick);
+            }
+        });
+    </script>
+</body>
+</html>
