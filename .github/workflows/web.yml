@@ -1,0 +1,85 @@
+# Compila a versão web do app Flutter (MANGETECH/app_integrador/) e publica no
+# GitHub Pages dentro de uma moldura de celular (docs/moldura/index.html), que
+# carrega o app de app/. O front Vue e a API Django não passam por aqui: o
+# workflow só roda quando muda o app, a moldura ou ele mesmo.
+#
+# Antes do primeiro uso, o dono do repositório precisa:
+#   1. Settings > Pages > Source: "GitHub Actions" (num repositório privado o
+#      Pages só existe em plano pago ou depois de tornar o repositório público;
+#      até lá, a etapa "deploy" falha e a de compilar continua valendo);
+#   2. opcional: Settings > Secrets and variables > Actions > Variables >
+#      API_URL = endereço da API; sem ela, usa a API publicada no Render.
+#
+# Flutter fixado em 3.35.4 (Dart 3.9.2) de propósito: é a revisão com que o
+# projeto foi criado (.metadata) e o pubspec.lock exige Dart >= 3.9 e
+# Flutter >= 3.35; o projeto Android está em AGP 8.9.1 / Gradle 8.12 /
+# Kotlin 2.1.0, que são os que esse Flutter gera. Mantenha igual ao apk.yml.
+name: Web (GitHub Pages)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'MANGETECH/app_integrador/**'
+      - 'docs/moldura/**'
+      - '.github/workflows/web.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: MANGETECH/app_integrador
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.4
+          cache: true
+
+      - name: Dependências
+        run: flutter pub get
+
+      - name: Compilar
+        run: >
+          flutter build web --release
+          --base-href /mangetech/app/
+          --dart-define=API_URL=${{ vars.API_URL || 'https://mangetech-api.onrender.com/api' }}
+
+      # A página publicada é a moldura de celular (docs/moldura/index.html), que
+      # carrega o app compilado de app/. Em celular de verdade a moldura some.
+      - name: Montar o site (moldura + app)
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p _site/app
+          cp docs/moldura/index.html _site/index.html
+          cp -r MANGETECH/app_integrador/build/web/. _site/app/
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    permissions:
+      pages: write
+      id-token: write
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

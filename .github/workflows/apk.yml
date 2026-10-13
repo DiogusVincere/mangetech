@@ -1,0 +1,73 @@
+# Compila o APK Android do app Flutter (MANGETECH/app_integrador/) em todo push
+# na main que mexa no app e em tags v*; em tag, anexa o APK à release do GitHub.
+# (O filtro de paths não vale para push de tag: a tag v* sempre compila.)
+#
+# O APK sai assinado com a chave de debug (é o que android/app/build.gradle.kts
+# faz): instala em qualquer aparelho, mas não serve para a Play Store.
+#
+# A URL da API entra por --dart-define=API_URL (lida em lib/data/api/api_service.dart,
+# sem barra no fim). Sem a variável API_URL do repositório (Settings > Secrets
+# and variables > Actions > Variables), usa a API publicada no Render.
+#
+# Flutter fixado em 3.35.4 pelo mesmo motivo do web.yml (pubspec.lock exige
+# Dart >= 3.9 e Flutter >= 3.35; AGP 8.9.1 / Gradle 8.12 / Kotlin 2.1.0).
+# Mantenha os dois iguais.
+name: APK (Android)
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+    paths:
+      - 'MANGETECH/app_integrador/**'
+      - '.github/workflows/apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write # para anexar o APK à release
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: MANGETECH/app_integrador
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.35.4
+          cache: true
+
+      - name: Dependências
+        run: flutter pub get
+
+      - name: Compilar APK
+        run: >
+          flutter build apk --release
+          --dart-define=API_URL=${{ vars.API_URL || 'https://mangetech-api.onrender.com/api' }}
+
+      - name: Nomear o APK pela ref (main ou tag)
+        run: >
+          cp build/app/outputs/flutter-apk/app-release.apk
+          build/app/outputs/flutter-apk/mangetech-${{ github.ref_name }}.apk
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: mangetech-apk-${{ github.ref_name }}
+          path: MANGETECH/app_integrador/build/app/outputs/flutter-apk/mangetech-*.apk
+          if-no-files-found: error
+
+      - name: Anexar à release (só em tag v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: MANGETECH/app_integrador/build/app/outputs/flutter-apk/mangetech-*.apk
+          generate_release_notes: true

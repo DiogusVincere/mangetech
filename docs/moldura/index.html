@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MangeTech app · demonstração</title>
+<meta name="description" content="Demonstração web do app MangeTech, app Flutter de chamados de manutenção e gestão de ativos, exibido numa moldura de celular.">
+<style>
+  :root {
+    --fundo: #0f1117; --fundo2: #171b26; --texto: #e6edf3; --texto2: #9aa4b2;
+    --acento: #7aa2f7; --acento2: #4fd1c5; --bezel: #0b0d12; --borda: #2a3140;
+    --largura-tela: 390px; --altura-tela: 844px; --bezel-px: 12px;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--fundo); color: var(--texto);
+    font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif; }
+  body { background: radial-gradient(1200px 700px at 20% 10%, #1a2238 0%, var(--fundo) 60%); }
+  .palco { min-height: 100%; display: grid; grid-template-columns: minmax(280px, 420px) auto;
+    gap: 48px; align-items: center; justify-content: center; padding: 40px 24px; }
+  .texto h1 { margin: 0 0 6px; font-size: 34px; letter-spacing: -0.02em; }
+  .texto .sub { color: var(--acento2); font-weight: 600; margin-bottom: 18px; }
+  .texto p { color: var(--texto2); line-height: 1.55; margin: 0 0 20px; }
+  .botoes { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 18px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 16px; border-radius: 10px;
+    text-decoration: none; font-weight: 600; font-size: 14px; border: 1px solid var(--borda);
+    color: var(--texto); background: var(--fundo2); transition: transform .12s, border-color .12s; }
+  .btn:hover { transform: translateY(-1px); border-color: var(--acento); }
+  .btn.principal { background: var(--acento); color: #0b0d12; border-color: var(--acento); }
+  .dica { font-size: 13px; color: var(--texto2); }
+  .dica code { background: var(--fundo2); padding: 2px 6px; border-radius: 6px; }
+
+  .celular-wrap { display: flex; justify-content: center; }
+  .celular { position: relative; width: calc(var(--largura-tela) + 2 * var(--bezel-px));
+    height: calc(var(--altura-tela) + 2 * var(--bezel-px)); background: var(--bezel);
+    border-radius: 54px; padding: var(--bezel-px);
+    box-shadow: 0 30px 80px rgba(0,0,0,.6), inset 0 0 0 2px #262b36, 0 0 0 1px #000;
+    transform-origin: center center; }
+  .celular::before { /* ilha */
+    content: ""; position: absolute; left: 50%; top: calc(var(--bezel-px) + 10px); width: 120px; height: 34px;
+    transform: translateX(-50%); background: #000; border-radius: 20px; z-index: 3; }
+  .botao-lateral { position: absolute; width: 4px; background: #1c2029; border-radius: 2px; }
+  .botao-lateral.silencio { left: -4px; top: 150px; height: 34px; }
+  .botao-lateral.volume-cima { left: -4px; top: 210px; height: 64px; }
+  .botao-lateral.volume-baixo { left: -4px; top: 290px; height: 64px; }
+  .botao-lateral.ligar { right: -4px; top: 240px; height: 96px; }
+  .tela { width: var(--largura-tela); height: var(--altura-tela); border-radius: 44px; overflow: hidden;
+    background: #fff; position: relative; }
+  .tela iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .carregando { position: absolute; inset: 0; display: grid; place-items: center; background: #0f1117;
+    color: var(--texto2); font-size: 14px; gap: 10px; z-index: 2; transition: opacity .4s; }
+  .carregando .anel { width: 34px; height: 34px; border-radius: 50%; border: 3px solid #2a3140;
+    border-top-color: var(--acento); animation: gira 1s linear infinite; }
+  @keyframes gira { to { transform: rotate(360deg); } }
+  .carregando.some { opacity: 0; pointer-events: none; }
+
+  @media (max-width: 900px) { .palco { grid-template-columns: 1fr; gap: 24px; text-align: center; }
+    .botoes { justify-content: center; } }
+  @media (max-width: 520px) { /* num celular de verdade, o app ocupa a tela toda */
+    .palco { display: block; padding: 0; min-height: 100dvh; }
+    .texto { display: none; }
+    .celular { width: 100%; height: 100dvh; border-radius: 0; padding: 0; box-shadow: none; }
+    .celular::before, .botao-lateral { display: none; }
+    .tela { width: 100%; height: 100%; border-radius: 0; } }
+</style>
+</head>
+<body>
+<main class="palco">
+  <section class="texto">
+    <h1>MangeTech app</h1>
+    <div class="sub">App Flutter de chamados de manutenção e gestão de ativos</div>
+    <p>Abre e acompanha chamados do chão de fábrica, cadastra equipamentos com QR code e mostra o dashboard
+       da gestão, usando a API Django do projeto. Esta é a versão web do app, rodando dentro de uma moldura
+       de celular. Use o mouse como se fosse o dedo.</p>
+    <div class="botoes">
+      <a class="btn principal" href="https://github.com/DiogusVincere/mangetech/releases" target="_blank" rel="noopener">Baixar APK (Android)</a>
+      <a class="btn" href="https://github.com/DiogusVincere/mangetech" target="_blank" rel="noopener">Ver código</a>
+      <a class="btn" href="app/" target="_blank" rel="noopener">Abrir em tela cheia</a>
+    </div>
+    <div class="dica">Entre com <code>demo@mangetech.local</code> e a senha <code>demo1234</code>.
+      A API no Render dorme sem uso: o primeiro acesso pode levar uns 30 s.</div>
+  </section>
+
+  <div class="celular-wrap">
+    <div class="celular" id="celular">
+      <span class="botao-lateral silencio"></span>
+      <span class="botao-lateral volume-cima"></span>
+      <span class="botao-lateral volume-baixo"></span>
+      <span class="botao-lateral ligar"></span>
+      <div class="tela">
+        <div class="carregando" id="carregando"><div class="anel"></div><div>Carregando o app…</div></div>
+        <iframe id="app" src="app/" title="MangeTech app" allow="camera; geolocation; clipboard-write"></iframe>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+  // Encolhe a moldura quando a janela é mais baixa que o celular (notebooks).
+  (function () {
+    var cel = document.getElementById('celular');
+    function ajustar() {
+      if (window.innerWidth <= 520) { cel.style.transform = ''; return; }
+      var alturaCel = 844 + 24, folga = 80;
+      var escala = Math.min(1, (window.innerHeight - folga) / alturaCel);
+      cel.style.transform = 'scale(' + escala.toFixed(3) + ')';
+      cel.style.marginTop = cel.style.marginBottom = (-(1 - escala) * alturaCel / 2) + 'px';
+    }
+    window.addEventListener('resize', ajustar); ajustar();
+    var app = document.getElementById('app'), carregando = document.getElementById('carregando');
+    app.addEventListener('load', function () { setTimeout(function () { carregando.classList.add('some'); }, 1200); });
+    setTimeout(function () { carregando.classList.add('some'); }, 15000);
+  })();
+</script>
+</body>
+</html>
