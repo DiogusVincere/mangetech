@@ -228,6 +228,16 @@ class ChamadoReadSerializer(serializers.ModelSerializer):
         )
 
 
+class ChamadoListSerializer(ChamadoReadSerializer):
+    """Listagem: sem histórico, comentários e anexos (vêm no detalhe)."""
+
+    class Meta(ChamadoReadSerializer.Meta):
+        fields = [
+            f for f in ChamadoReadSerializer.Meta.fields
+            if f not in ('historico', 'comentarios', 'anexos_detalhes')
+        ]
+
+
 class ChamadoWriteSerializer(serializers.ModelSerializer):
     """Criação/edição. Aceita o ativo como texto (`ativo`) e/ou pelo id (`ativo_ref`)."""
 
@@ -258,7 +268,7 @@ class ChamadoWriteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'ativo': 'Informe o ativo/equipamento.'})
         # Trocou o ativo pelo id sem mandar texto: o texto acompanha o novo ativo.
         if 'ativo_ref' in attrs and attrs['ativo_ref'] and 'ativo' not in attrs:
-            attrs['ativo'] = f"{attrs['ativo_ref'].codigo} - {attrs['ativo_ref'].nome}"
+            attrs['ativo'] = f"{attrs['ativo_ref'].codigo} - {attrs['ativo_ref'].nome}"[:200]
         # Trocou só o texto: refaz o vínculo a partir dele.
         if 'ativo' in attrs and 'ativo_ref' not in attrs:
             attrs['ativo_ref'] = Ativo.buscar_por_texto(attrs['ativo'])
@@ -415,6 +425,18 @@ class UserRegistrationSerializer(serializers.Serializer):
         if User.objects.filter(email__iexact=value).exists() or User.objects.filter(username__iexact=value).exists():
             raise serializers.ValidationError('Este e-mail já está cadastrado.')
         return value
+
+    def validate(self, attrs):
+        from django.contrib.auth.password_validation import validate_password
+        from django.core.exceptions import ValidationError as DjangoValidationError
+        partes = attrs['nome'].split(' ', 1)
+        candidato = User(username=attrs['email'], email=attrs['email'], first_name=partes[0][:150],
+                         last_name=(partes[1] if len(partes) > 1 else '')[:150])
+        try:
+            validate_password(attrs['senha'], candidato)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError({'senha': list(exc.messages)})
+        return attrs
 
     def validate_nome(self, value):
         value = ' '.join(value.split())

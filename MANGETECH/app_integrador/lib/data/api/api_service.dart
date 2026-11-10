@@ -338,16 +338,13 @@ class ApiService {
 
       print('Buscando chamados: $uri');
 
-      final response = await http
-          .get(uri, headers: await _getHeaders())
-          .timeout(timeout);
+      final results = await _todasAsPaginas(uri);
 
-      final data = _handleResponse(response);
-      final results = data['results'] ?? data;
+      print('Retornados ${results.length} chamados');
 
-      print('Retornados ${(results as List).length} chamados');
-
-      return (results as List).map((json) => Chamado.fromJson(json)).toList();
+      return results
+          .map((json) => Chamado.fromJson(Map<String, dynamic>.from(json as Map)))
+          .toList();
     } catch (e) {
       print('❌ Erro ao carregar chamados: $e');
       throw Exception('Erro ao carregar chamados: $e');
@@ -844,18 +841,33 @@ class ApiService {
   }
 
   Future<List<Chamado>> getChamadosDoAtivo(int ativoId) async {
-    final response = await http
-        .get(
-          Uri.parse('$baseUrl/chamados/')
-              .replace(queryParameters: {'ativo_ref': '$ativoId', 'page_size': '500'}),
-          headers: await _getHeaders(),
-        )
-        .timeout(timeout);
-    final data = _handleResponse(response);
-    final results = data is Map ? (data['results'] ?? []) : data;
-    return (results as List)
+    final results = await _todasAsPaginas(
+      Uri.parse('$baseUrl/chamados/')
+          .replace(queryParameters: {'ativo_ref': '$ativoId', 'page_size': '500'}),
+    );
+    return results
         .map((json) => Chamado.fromJson(Map<String, dynamic>.from(json as Map)))
         .toList();
+  }
+
+  /// Lê uma listagem paginada da API seguindo o campo "next" até o fim.
+  Future<List<dynamic>> _todasAsPaginas(Uri uri) async {
+    final itens = <dynamic>[];
+    Uri? proxima = uri;
+    while (proxima != null) {
+      final response = await http
+          .get(proxima, headers: await _getHeaders())
+          .timeout(timeout);
+      final data = _handleResponse(response);
+      if (data is List) {
+        itens.addAll(data);
+        break;
+      }
+      itens.addAll((data['results'] as List?) ?? const []);
+      final next = data['next'];
+      proxima = next is String && next.isNotEmpty ? Uri.parse(next) : null;
+    }
+    return itens;
   }
 
   // ========== DASHBOARD GERENCIAL ==========

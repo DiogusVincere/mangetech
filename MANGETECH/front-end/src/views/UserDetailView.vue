@@ -40,15 +40,15 @@
                 
                 <span v-if="user.is_superuser" class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200 flex items-center">
                   <Crown :size="14" class="mr-1" />
-                  Super Admin
+                  {{ roleLabel(user) }}
                 </span>
                 <span v-else-if="user.is_staff" class="px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200 flex items-center">
                   <Shield :size="14" class="mr-1" />
-                  Administrador
+                  {{ roleLabel(user) }}
                 </span>
                 <span v-else class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center">
                   <UserIcon :size="14" class="mr-1" />
-                  Usuário
+                  {{ roleLabel(user) }}
                 </span>
               </div>
             </div>
@@ -253,7 +253,7 @@ import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
 import { usersApi, authApi, extractError } from '@/api'
-import { formatDate, priorityClass, statusClass, statusLabel, timeAgo } from '@/utils/display'
+import { formatDate, priorityClass, statusClass, statusLabel, timeAgo, roleLabel } from '@/utils/display'
 import ChangePermissionModal from '@/components/modals/ChangePermissionModal.vue'
 import {
   ArrowLeft, Mail, Shield, Key, Ban, Crown,

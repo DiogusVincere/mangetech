@@ -85,9 +85,11 @@ class AuthTests(Base):
 
     def test_cadastro_e_email_duplicado(self):
         r = self.client.post('/api/auth/register/', {'nome': 'Novo Usuário', 'email': 'novo@x.com', 'senha': '123456'}, format='json')
+        self.assertEqual(r.status_code, 400)  # senha só numérica/comum
+        r = self.client.post('/api/auth/register/', {'nome': 'Novo Usuário', 'email': 'novo@x.com', 'senha': 'Torno#2026'}, format='json')
         self.assertEqual(r.status_code, 201, r.content)
         self.assertEqual(r.json()['user']['first_name'], 'Novo')
-        r = self.client.post('/api/auth/register/', {'nome': 'Outro', 'email': 'NOVO@x.com', 'senha': '123456'}, format='json')
+        r = self.client.post('/api/auth/register/', {'nome': 'Outro', 'email': 'NOVO@x.com', 'senha': 'Torno#2026'}, format='json')
         self.assertEqual(r.status_code, 400)
         self.assertIn('cadastrado', r.json()['message'])
 
@@ -170,6 +172,11 @@ class ChamadoTests(Base):
         self.assertEqual(r.json()['chamados'], [])
         r = self.client.get(f'/api/ativos/{self.ativo.id}/chamados/')
         self.assertEqual(len(r.json()['chamados']), 1)
+
+    def test_texto_do_ativo_cabe_no_campo(self):
+        longo = Ativo.objects.create(codigo='LINHA-2-PRENSA-01', nome='P' * 200, modelo='X')
+        dados = self.criar_chamado(ativo='', ativo_ref=longo.id)
+        self.assertEqual(len(dados['ativo']), 200)
 
     def test_criar_pelo_id_do_ativo_preenche_texto_e_ambiente(self):
         dados = self.criar_chamado(ativo='', ativo_ref=self.ativo10.id, ambiente='')
@@ -263,6 +270,8 @@ class ChamadoTests(Base):
         self.assertEqual(r.json()['count'], 1)
         r = self.client.get('/api/chamados/?page_size=1')
         self.assertEqual(len(r.json()['results']), 1)
+        self.assertNotIn('historico', r.json()['results'][0])  # lista enxuta
+        self.assertIn('historico', self.client.get(f"/api/chamados/{c['id']}/").json())
 
     def test_desvincular_ativo_e_respeitado(self):
         c = self.criar_chamado(ativo='AST-001 - Compressor')

@@ -297,6 +297,8 @@ const removeAsset = async () => {
 }
 
 onMounted(() => {
+  // Tira o ?qr=1 da URL: recarregar ou voltar não reabre o QR.
+  if (route.query.qr) router.replace({ query: {} })
   loadAsset()
   loadTasks()
 })

@@ -190,10 +190,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'chamados.pagination.Paginacao',
     'PAGE_SIZE': 50,
     # Limite por IP nos endpoints públicos de login, cadastro e recuperação de senha.
-    # Quantos proxies ficam na frente da API (Render: 1). Com o valor definido, o
-    # DRF usa o IP que o proxy acrescentou no X-Forwarded-For, não o que o
-    # cliente mandou; 0 usa REMOTE_ADDR.
-    'NUM_PROXIES': int(os.environ.get('NUM_PROXIES', '1')),
+    # Quantos proxies ficam na frente da API. 0 (padrão) usa REMOTE_ADDR e
+    # ignora o X-Forwarded-For; no Render o render.yaml define 1, e o DRF passa a
+    # usar o IP que o proxy acrescentou, não o que o cliente mandou.
+    'NUM_PROXIES': int(os.environ.get('NUM_PROXIES', '0')),
     'DEFAULT_THROTTLE_RATES': {
         'auth': os.environ.get('AUTH_THROTTLE_RATE', '30/min'),
     },

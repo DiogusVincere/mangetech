@@ -26,18 +26,18 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
   @override
   void initState() {
     super.initState();
-    // Aberto a partir do ativo/QR: o chamado pode não estar na lista carregada.
+    // A listagem da API não traz histórico nem comentários: busca sempre o
+    // chamado completo. Se ele nem está na lista (aberto pelo ativo/QR),
+    // mostra o carregando até chegar.
     _buscando = Provider.of<ChamadoProvider>(context, listen: false)
             .getChamadoById(widget.chamadoId) ==
         null;
-    if (_buscando) {
-      WidgetsBinding.instance.addPostFrameCallback((_) async {
-        if (!mounted) return;
-        await Provider.of<ChamadoProvider>(context, listen: false)
-            .fetchChamadoById(widget.chamadoId);
-        if (mounted) setState(() => _buscando = false);
-      });
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      await Provider.of<ChamadoProvider>(context, listen: false)
+          .fetchChamadoById(widget.chamadoId);
+      if (mounted) setState(() => _buscando = false);
+    });
   }
 
   Future<void> _navigateToEdit(Chamado chamado) async {

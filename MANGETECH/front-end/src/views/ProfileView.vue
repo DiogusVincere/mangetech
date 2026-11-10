@@ -23,15 +23,15 @@
                 <div class="mt-2">
                   <span v-if="authStore.user?.is_superuser" class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200">
                     <Crown :size="14" class="inline mr-1" />
-                    Super Admin
+                    {{ roleLabel(authStore.user) }}
                   </span>
                   <span v-else-if="authStore.user?.is_staff" class="px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200">
                     <Shield :size="14" class="inline mr-1" />
-                    Administrador
+                    {{ roleLabel(authStore.user) }}
                   </span>
                   <span v-else class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200">
                     <User :size="14" class="inline mr-1" />
-                    Usuário
+                    {{ roleLabel(authStore.user) }}
                   </span>
                 </div>
               </div>
@@ -193,13 +193,13 @@
                 <dt class="text-sm font-medium text-gray-500">Tipo de Conta</dt>
                 <dd class="mt-1">
                   <span v-if="authStore.user?.is_superuser" class="px-2 py-1 text-xs rounded-full font-medium bg-red-100 text-red-800 border border-red-200">
-                    Super Administrador
+                    {{ roleLabel(authStore.user) }}
                   </span>
                   <span v-else-if="authStore.user?.is_staff" class="px-2 py-1 text-xs rounded-full font-medium bg-purple-100 text-purple-800 border border-purple-200">
-                    Administrador
+                    {{ roleLabel(authStore.user) }}
                   </span>
                   <span v-else class="px-2 py-1 text-xs rounded-full font-medium bg-gray-100 text-gray-800">
-                    Usuário Padrão
+                    {{ roleLabel(authStore.user) }}
                   </span>
                 </dd>
               </div>
@@ -400,7 +400,7 @@ import { profileApi, extractError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { UserStats } from '@/types'
-import { statusLabel, timeAgo } from '@/utils/display'
+import { statusLabel, timeAgo, roleLabel } from '@/utils/display'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()

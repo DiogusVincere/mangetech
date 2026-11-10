@@ -2,6 +2,7 @@ import csv
 from datetime import timedelta
 
 from django.contrib.auth.models import User, update_last_login
+from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 from django.db.models import Count, Min, OuterRef, Q, Subquery
@@ -28,7 +29,6 @@ from .models import (
     ChamadoStatusImage,
     Comentario,
     TokenRecuperacaoSenha,
-    VerificacaoEmail,
 )
 from .qr_generator import QRCodeGenerator
 from .serializers import (
@@ -36,6 +36,7 @@ from .serializers import (
     AtivoHistoricoSerializer,
     AtivoSerializer,
     ChamadoAnexoSerializer,
+    ChamadoListSerializer,
     ChamadoReadSerializer,
     ChamadoWriteSerializer,
     ComentarioSerializer,
@@ -258,6 +259,10 @@ def resetar_senha(request):
     usuario, token_obj, erro = _token_do_pedido(request)
     if erro:
         return erro
+    try:
+        validate_password(nova_senha, usuario)
+    except DjangoValidationError as exc:
+        return _erro(' '.join(exc.messages))
 
     with transaction.atomic():
         if not token_obj.verificar_token(request.data.get('token', '')):
@@ -278,16 +283,8 @@ def verificar_email_real(request):
     if not email:
         return _erro('E-mail é obrigatório.')
 
+    # Só responde; não grava (endpoint anônimo não deve encher o banco).
     resultado = VerificadorEmail.verificar_email_completo(email)
-    VerificacaoEmail.objects.update_or_create(
-        email=email,
-        defaults={
-            'status': 'VERIFICADO' if resultado['valido'] else 'REJEITADO',
-            'dominio_valido': resultado['dominio_ok'],
-            'email_real': resultado['valido'],
-            'verificado_em': timezone.now() if resultado['valido'] else None,
-        },
-    )
     corpo = {
         'success': resultado['valido'],
         'email': email,
@@ -312,12 +309,15 @@ class ChamadoViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
             return ChamadoWriteSerializer
+        if self.action == 'list':
+            return ChamadoListSerializer
         return ChamadoReadSerializer
 
     def get_queryset(self):
-        return _chamados_visiveis(self.request.user).select_related(
-            'solicitante', 'ativo_ref'
-        ).prefetch_related(
+        qs = _chamados_visiveis(self.request.user).select_related('solicitante', 'ativo_ref')
+        if self.action == 'list':
+            return qs.prefetch_related('responsaveis')
+        return qs.prefetch_related(
             'responsaveis',
             'historico__usuario',
             'historico__fotos',
@@ -861,7 +861,7 @@ def dashboard_gerencial(request):
                 'ultimos_90_dias': visiveis.filter(data_criacao__gte=agora - timedelta(days=90)).count(),
             },
             'tempo_resolucao': tempo_resolucao,
-            'criticos': ChamadoReadSerializer(
+            'criticos': ChamadoListSerializer(
                 criticos.select_related('solicitante', 'ativo_ref').prefetch_related('responsaveis')[:10],
                 many=True, context={'request': request},
             ).data,
@@ -971,6 +971,11 @@ def change_password(request):
         errors['nova_senha'] = 'A nova senha precisa ter pelo menos 6 caracteres.'
     if nova_senha != confirmar:
         errors['confirmar_senha'] = 'As senhas não conferem.'
+    if 'nova_senha' not in errors:
+        try:
+            validate_password(nova_senha, user)
+        except DjangoValidationError as exc:
+            errors['nova_senha'] = ' '.join(exc.messages)
     if errors:
         return Response({'success': False, 'message': next(iter(errors.values())), 'errors': errors},
                         status=status.HTTP_400_BAD_REQUEST)

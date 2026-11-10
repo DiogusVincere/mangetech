@@ -77,7 +77,7 @@ class Chamado(models.Model):
         if self._state.adding and self.ativo_ref_id is None and self.ativo:
             self.ativo_ref = Ativo.buscar_por_texto(self.ativo)
         elif self.ativo_ref_id and not (self.ativo or '').strip():
-            self.ativo = f"{self.ativo_ref.codigo} - {self.ativo_ref.nome}"
+            self.ativo = f"{self.ativo_ref.codigo} - {self.ativo_ref.nome}"[:200]
         super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
