@@ -77,16 +77,27 @@ class ApiService {
       final error = json.decode(utf8.decode(response.bodyBytes));
       throw Exception(_formatErrorMessage(error));
     } else if (response.statusCode == 401) {
-      throw Exception('Não autorizado. Faça login novamente.');
+      throw Exception(_mensagemDoServidor(response) ?? 'Não autorizado. Faça login novamente.');
     } else if (response.statusCode == 403) {
-      throw Exception('Acesso negado.');
+      throw Exception(_mensagemDoServidor(response) ?? 'Acesso negado.');
     } else if (response.statusCode == 404) {
-      throw Exception('Recurso não encontrado.');
+      throw Exception(_mensagemDoServidor(response) ?? 'Recurso não encontrado.');
     } else if (response.statusCode == 500) {
       throw Exception('Erro no servidor. Tente novamente mais tarde.');
     } else {
       throw Exception('Erro: ${response.statusCode}');
     }
+  }
+
+  String? _mensagemDoServidor(http.Response response) {
+    try {
+      final body = json.decode(utf8.decode(response.bodyBytes));
+      if (body is Map) {
+        final msg = body['message'] ?? body['detail'];
+        if (msg is String && msg.isNotEmpty) return msg;
+      }
+    } catch (_) {}
+    return null;
   }
 
   String _formatErrorMessage(dynamic error) {
@@ -177,16 +188,19 @@ class ApiService {
             headers: await _getHeaders(),
           )
           .timeout(timeout);
+    } catch (_) {
+      // sem rede ou token já inválido: sai do mesmo jeito
     } finally {
       await _removeToken();
     }
   }
 
+  /// Envia o código de 6 dígitos para o e-mail (vale 15 minutos).
   Future<Map<String, dynamic>> recuperarSenha({required String email}) async {
     try {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/auth/recuperar-senha/'),
+            Uri.parse('$baseUrl/auth/solicitar-recuperacao-senha/'),
             headers: await _getHeaders(includeAuth: false),
             body: json.encode({'email': email}),
           )
@@ -196,6 +210,87 @@ class ApiService {
     } catch (e) {
       throw Exception('Erro ao recuperar senha: $e');
     }
+  }
+
+  /// Confere o código sem consumi-lo (o consumo acontece em [resetarSenha]).
+  Future<Map<String, dynamic>> verificarCodigoRecuperacao({
+    required String email,
+    required String codigo,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/auth/verificar-token-recuperacao/'),
+          headers: await _getHeaders(includeAuth: false),
+          body: json.encode({'email': email, 'token': codigo}),
+        )
+        .timeout(timeout);
+    return _handleResponse(response);
+  }
+
+  Future<Map<String, dynamic>> resetarSenha({
+    required String email,
+    required String codigo,
+    required String novaSenha,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/auth/resetar-senha/'),
+          headers: await _getHeaders(includeAuth: false),
+          body: json.encode({
+            'email': email,
+            'token': codigo,
+            'nova_senha': novaSenha,
+            'confirmar_senha': novaSenha,
+          }),
+        )
+        .timeout(timeout);
+    return _handleResponse(response);
+  }
+
+  /// Troca a senha do usuário logado. A API invalida o token antigo e devolve
+  /// outro, que é salvo aqui (sem isso as próximas chamadas davam 401).
+  Future<void> alterarSenha({
+    required String senhaAtual,
+    required String novaSenha,
+  }) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/perfil/alterar-senha/'),
+          headers: await _getHeaders(),
+          body: json.encode({
+            'senha_atual': senhaAtual,
+            'nova_senha': novaSenha,
+            'confirmar_senha': novaSenha,
+          }),
+        )
+        .timeout(timeout);
+    final data = _handleResponse(response);
+    if (data is Map && data['token'] is String) {
+      await _saveToken(data['token'] as String);
+    }
+  }
+
+  Future<Map<String, dynamic>> atualizarPerfil({
+    String? firstName,
+    String? lastName,
+    String? email,
+    String? username,
+  }) async {
+    final body = <String, dynamic>{
+      if (username != null) 'username': username,
+      if (firstName != null) 'first_name': firstName,
+      if (lastName != null) 'last_name': lastName,
+      if (email != null) 'email': email,
+    };
+    final response = await http
+        .patch(
+          Uri.parse('$baseUrl/perfil/atualizar/'),
+          headers: await _getHeaders(),
+          body: json.encode(body),
+        )
+        .timeout(timeout);
+    final data = _handleResponse(response);
+    return Map<String, dynamic>.from((data is Map ? data['data'] : null) ?? {});
   }
 
   // ========== CHAMADOS COM FILTROS AVANÇADOS ==========
@@ -216,7 +311,7 @@ class ApiService {
     try {
       var uri = Uri.parse('$baseUrl/chamados/');
 
-      final queryParams = <String, String>{};
+      final queryParams = <String, String>{'page_size': '500'};
 
       if (status != null && status.isNotEmpty) queryParams['status'] = status;
       if (urgencia != null && urgencia.isNotEmpty) queryParams['urgencia'] = urgencia;
@@ -450,7 +545,7 @@ class ApiService {
 
       for (var anexo in anexos) {
         request.files.add(
-          await http.MultipartFile.fromPath('anexos', anexo.path),
+          await http.MultipartFile.fromPath('fotos', anexo.path),
         );
       }
 
@@ -507,9 +602,10 @@ class ApiService {
     try {
       var uri = Uri.parse('$baseUrl/ativos/');
 
-      if (search != null && search.isNotEmpty) {
-        uri = uri.replace(queryParameters: {'search': search});
-      }
+      uri = uri.replace(queryParameters: {
+        'page_size': '1000',
+        if (search != null && search.isNotEmpty) 'search': search,
+      });
 
       print('GET $uri');
 
@@ -572,9 +668,10 @@ class ApiService {
     try {
       var uri = Uri.parse('$baseUrl/ativos/');
 
-      if (search != null && search.isNotEmpty) {
-        uri = uri.replace(queryParameters: {'search': search});
-      }
+      uri = uri.replace(queryParameters: {
+        'page_size': '1000',
+        if (search != null && search.isNotEmpty) 'search': search,
+      });
 
       print('GET $uri (getAtivosMap)');
 
@@ -615,9 +712,9 @@ class ApiService {
       for (var i = 0; i < ativosList.length; i++) {
         try {
           final ativoMap = Map<String, dynamic>.from(ativosList[i] as Map);
-          
-          if (ativoMap['id'] != null && 
-              ativoMap['codigo'] != null && 
+
+          if (ativoMap['id'] != null &&
+              ativoMap['codigo'] != null &&
               ativoMap['nome'] != null) {
             ativos.add(ativoMap);
           }
@@ -627,7 +724,7 @@ class ApiService {
       }
 
       print('Ativos válidos: ${ativos.length}');
-      
+
       if (ativos.isNotEmpty) {
         print('Exemplo: ${ativos.first}');
       }
@@ -641,18 +738,17 @@ class ApiService {
 
   Future<Ativo> getAtivoByQRCode(String codigo) async {
     try {
+      final uri = Uri.parse('$baseUrl/ativos/por-codigo/')
+          .replace(queryParameters: {'codigo': codigo.trim()});
       final response = await http
-          .get(
-            Uri.parse('$baseUrl/ativos/?search=$codigo'),
-            headers: await _getHeaders(),
-          )
+          .get(uri, headers: await _getHeaders())
           .timeout(timeout);
 
       final data = _handleResponse(response);
-      final results = data['results'] ?? data;
+      final encontrado = data is Map ? data['ativo'] : null;
 
-      if (results is List && results.isNotEmpty) {
-        final ativoMap = Map<String, dynamic>.from(results[0] as Map);
+      if (encontrado is Map) {
+        final ativoMap = Map<String, dynamic>.from(encontrado);
 
         if (ativoMap['id'] is String) {
           ativoMap['id'] = int.tryParse(ativoMap['id']) ?? 0;
@@ -747,15 +843,31 @@ class ApiService {
     }
   }
 
+  Future<List<Chamado>> getChamadosDoAtivo(int ativoId) async {
+    final response = await http
+        .get(
+          Uri.parse('$baseUrl/chamados/')
+              .replace(queryParameters: {'ativo_ref': '$ativoId', 'page_size': '500'}),
+          headers: await _getHeaders(),
+        )
+        .timeout(timeout);
+    final data = _handleResponse(response);
+    final results = data is Map ? (data['results'] ?? []) : data;
+    return (results as List)
+        .map((json) => Chamado.fromJson(Map<String, dynamic>.from(json as Map)))
+        .toList();
+  }
+
   // ========== DASHBOARD GERENCIAL ==========
 
-  Future<Map<String, dynamic>> getDashboardGerencial() async {
+  Future<Map<String, dynamic>> getDashboardGerencial({int? dias}) async {
     try {
+      var uri = Uri.parse('$baseUrl/dashboard/gerencial/');
+      if (dias != null && dias > 0) {
+        uri = uri.replace(queryParameters: {'dias': '$dias'});
+      }
       final response = await http
-          .get(
-            Uri.parse('$baseUrl/dashboard/gerencial/'),
-            headers: await _getHeaders(),
-          )
+          .get(uri, headers: await _getHeaders())
           .timeout(timeout);
 
       final data = _handleResponse(response);
@@ -789,9 +901,10 @@ class ApiService {
 
       var uri = Uri.parse('$baseUrl/usuarios/');
 
-      if (search != null && search.isNotEmpty) {
-        uri = uri.replace(queryParameters: {'search': search});
-      }
+      uri = uri.replace(queryParameters: {
+        'page_size': '1000',
+        if (search != null && search.isNotEmpty) 'search': search,
+      });
 
       final response = await http
           .get(uri, headers: await _getHeaders())
@@ -882,13 +995,13 @@ class ApiService {
   Future<bool> testConnection() async {
     try {
       print('Testando conexão: $baseUrl');
-      
+
       final response = await http
-          .get(Uri.parse('$baseUrl/chamados/'))
-          .timeout(const Duration(seconds: 5));
+          .get(Uri.parse('$baseUrl/health/'))
+          .timeout(const Duration(seconds: 40)); // Render gratuito demora a acordar
 
       print('Status: ${response.statusCode}');
-      return response.statusCode == 200 || response.statusCode == 401;
+      return response.statusCode == 200;
     } catch (e) {
       print('❌ Erro ao testar conexão: $e');
       return false;

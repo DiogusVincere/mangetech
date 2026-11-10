@@ -112,13 +112,15 @@ class ChamadoProvider with ChangeNotifier {
 
   // ========== BUSCAR CHAMADO POR ID ==========
 
+  // Chamados abertos pelo detalhe (QR, tela do ativo) que não estão na lista
+  // filtrada do dashboard. Ficam aqui para não bagunçar aquela lista.
+  final Map<String, Chamado> _avulsos = {};
+
   Chamado? getChamadoById(String id) {
-    try {
-      return _chamados.firstWhere((c) => c.id == id);
-    } catch (e) {
-      print('Chamado não encontrado: $id');
-      return null;
+    for (final c in _chamados) {
+      if (c.id == id) return c;
     }
+    return _avulsos[id];
   }
 
   Future<Chamado?> fetchChamadoById(String id) async {
@@ -128,8 +130,10 @@ class ChamadoProvider with ChangeNotifier {
       final index = _chamados.indexWhere((c) => c.id == id);
       if (index != -1) {
         _chamados[index] = chamado;
-        notifyListeners();
+      } else {
+        _avulsos[id] = chamado;
       }
+      notifyListeners();
 
       return chamado;
     } catch (e) {
@@ -206,8 +210,10 @@ class ChamadoProvider with ChangeNotifier {
       final index = _chamados.indexWhere((c) => c.id == chamadoId);
       if (index != -1) {
         _chamados[index] = chamadoAtualizado;
-        notifyListeners();
+      } else {
+        _avulsos[chamadoId] = chamadoAtualizado;
       }
+      notifyListeners();
 
       return true;
     } catch (e) {

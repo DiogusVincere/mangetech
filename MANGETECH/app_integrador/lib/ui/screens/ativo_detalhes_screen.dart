@@ -2,11 +2,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import '../../data/api/api_service.dart';
 import '../../data/providers/ativo_provider.dart';
-import '../../data/providers/chamado_provider.dart';
 import '../../models/ativo.dart';
 import '../../models/chamado.dart';
 import '../theme/app_theme.dart';
+import 'chamado_detalhe_screen.dart';
 import 'editar_ativo_screen.dart';
 
 class AtivoDetalhesScreen extends StatefulWidget {
@@ -28,7 +29,9 @@ class _AtivoDetalhesScreenState extends State<AtivoDetalhesScreen> {
   @override
   void initState() {
     super.initState();
-    _loadAtivoDetails();
+    // Depois do primeiro frame: carregar no initState notificava providers
+    // durante o build ("setState() called during build").
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAtivoDetails());
   }
 
   Future<void> _loadAtivoDetails() async {
@@ -39,19 +42,19 @@ class _AtivoDetalhesScreenState extends State<AtivoDetalhesScreen> {
 
     try {
       final ativoProvider = Provider.of<AtivoProvider>(context, listen: false);
-      
+
       // Buscar ativo específico
       final ativo = ativoProvider.getAtivoById(widget.ativoId);
-      
+
       if (ativo == null) {
         // Se não encontrou localmente, recarrega todos
         await ativoProvider.fetchAtivos();
         final ativoRecarregado = ativoProvider.getAtivoById(widget.ativoId);
-        
+
         if (ativoRecarregado == null) {
           throw Exception('Ativo não encontrado');
         }
-        
+
         setState(() {
           _ativo = ativoRecarregado;
         });
@@ -63,11 +66,13 @@ class _AtivoDetalhesScreenState extends State<AtivoDetalhesScreen> {
 
       // Carregar chamados relacionados
       await _loadChamadosRelacionados();
-      
+
+      if (!mounted) return;
       setState(() {
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -83,21 +88,16 @@ class _AtivoDetalhesScreenState extends State<AtivoDetalhesScreen> {
     });
 
     try {
-      final chamadoProvider = Provider.of<ChamadoProvider>(context, listen: false);
-      
-      // Buscar chamados que contém o código do ativo
-      await chamadoProvider.fetchChamados(search: _ativo!.codigo);
-      
-      // Filtrar apenas os que realmente são deste ativo
-      _chamadosRelacionados = chamadoProvider.chamados
-          .where((c) => c.ativo.contains(_ativo!.codigo))
-          .toList();
-      
+      // Chamados vinculados ao ativo pela API, sem mexer na lista do dashboard.
+      final chamados = await ApiService().getChamadosDoAtivo(_ativo!.id);
+      if (!mounted) return;
       setState(() {
+        _chamadosRelacionados = chamados;
         _isLoadingChamados = false;
       });
     } catch (e) {
       print('❌ Erro ao carregar chamados: $e');
+      if (!mounted) return;
       setState(() {
         _isLoadingChamados = false;
       });
@@ -459,11 +459,11 @@ class _AtivoDetalhesScreenState extends State<AtivoDetalhesScreen> {
                       ],
                     ),
                     onTap: () {
-                      // Navegar para detalhes do chamado
-                      Navigator.pushNamed(
-                        context,
-                        '/chamado-detalhes',
-                        arguments: chamado.id,
+                      // A rota nomeada "/chamado-detalhes" não existia e caía no login.
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => ChamadoDetailScreen(chamadoId: chamado.id),
+                        ),
                       );
                     },
                   );

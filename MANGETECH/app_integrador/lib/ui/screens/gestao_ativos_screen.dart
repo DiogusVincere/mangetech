@@ -385,7 +385,7 @@ class _GestaoAtivosScreenState extends State<GestaoAtivosScreen> {
   Widget _buildAssetCard(Ativo ativo) {
     return Card(
       child: InkWell(
-        onTap: () => _navigateToAtivoDetalhes(ativo), 
+        onTap: () => _navigateToAtivoDetalhes(ativo),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -529,6 +529,16 @@ class _GestaoAtivosScreenState extends State<GestaoAtivosScreen> {
   void _showQRScanner() {
     final MobileScannerController cameraController = MobileScannerController();
     final TextEditingController manualInputController = TextEditingController();
+    // O leitor dispara onDetect várias vezes por segundo: trata só a primeira
+    // leitura (antes fechava a folha mais de uma vez e podia fechar a tela).
+    var tratado = false;
+
+    void concluir(BuildContext sheetContext, String codigo) {
+      if (tratado) return;
+      tratado = true;
+      Navigator.pop(sheetContext);
+      _buscarAtivoPorQR(codigo.trim());
+    }
 
     showModalBottomSheet(
       context: context,
@@ -547,10 +557,7 @@ class _GestaoAtivosScreenState extends State<GestaoAtivosScreen> {
                 ),
                 IconButton(
                   icon: const Icon(Icons.close),
-                  onPressed: () {
-                    cameraController.dispose();
-                    Navigator.pop(context);
-                  },
+                  onPressed: () => Navigator.pop(context),
                 ),
               ],
             ),
@@ -561,12 +568,10 @@ class _GestaoAtivosScreenState extends State<GestaoAtivosScreen> {
                 child: MobileScanner(
                   controller: cameraController,
                   onDetect: (capture) {
-                    final List<Barcode> barcodes = capture.barcodes;
-                    for (final barcode in barcodes) {
-                      if (barcode.rawValue != null) {
-                        cameraController.dispose();
-                        Navigator.pop(context);
-                        _buscarAtivoPorQR(barcode.rawValue!);
+                    for (final barcode in capture.barcodes) {
+                      final valor = barcode.rawValue;
+                      if (valor != null && valor.trim().isNotEmpty) {
+                        concluir(context, valor);
                         break;
                       }
                     }
@@ -592,11 +597,11 @@ class _GestaoAtivosScreenState extends State<GestaoAtivosScreen> {
                 ),
                 const SizedBox(width: 8),
                 ElevatedButton(
+                  // O tema usa largura infinita; dentro de uma Row isso quebrava o layout.
+                  style: ElevatedButton.styleFrom(minimumSize: const Size(88, 48)),
                   onPressed: () {
-                    if (manualInputController.text.isNotEmpty) {
-                      cameraController.dispose();
-                      Navigator.pop(context);
-                      _buscarAtivoPorQR(manualInputController.text);
+                    if (manualInputController.text.trim().isNotEmpty) {
+                      concluir(context, manualInputController.text);
                     }
                   },
                   child: const Text('Buscar'),
@@ -608,7 +613,7 @@ class _GestaoAtivosScreenState extends State<GestaoAtivosScreen> {
       ),
     ).whenComplete(() {
       cameraController.dispose();
-      manualInputController.dispose();
+      Future.delayed(const Duration(milliseconds: 400), manualInputController.dispose);
     });
   }
 

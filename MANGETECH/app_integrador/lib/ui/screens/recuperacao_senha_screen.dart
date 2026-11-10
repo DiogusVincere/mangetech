@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../data/api/api_service.dart';
 import '../../data/providers/auth_provider.dart';
 
 class RecuperacaoSenhaScreen extends StatefulWidget {
@@ -15,6 +16,8 @@ class _RecuperacaoSenhaScreenState extends State<RecuperacaoSenhaScreen> {
   final _tokenController = TextEditingController();
   final _novaSenhaController = TextEditingController();
   final _confirmarSenhaController = TextEditingController();
+  final ApiService _api = ApiService();
+  String? _ultimoErroApi;
 
   bool _isLoading = false;
   bool _obscureNovaSenha = true;
@@ -124,9 +127,10 @@ class _RecuperacaoSenhaScreenState extends State<RecuperacaoSenhaScreen> {
           });
 
           _mostrarErro(
-            _tentativasRestantes > 0
-                ? 'Código inválido. $_tentativasRestantes tentativa(s) restante(s)'
-                : 'Máximo de tentativas atingido. Solicite um novo código.',
+            _ultimoErroApi ??
+                (_tentativasRestantes > 0
+                    ? 'Código inválido. $_tentativasRestantes tentativa(s) restante(s)'
+                    : 'Máximo de tentativas atingido. Solicite um novo código.'),
           );
         }
       }
@@ -176,7 +180,7 @@ class _RecuperacaoSenhaScreenState extends State<RecuperacaoSenhaScreen> {
             Navigator.of(context).pushReplacementNamed('/login');
           }
         } else {
-          _mostrarErro('Erro ao resetar senha. Tente novamente.');
+          _mostrarErro(_ultimoErroApi ?? 'Erro ao resetar senha. Tente novamente.');
         }
       }
     } catch (e) {
@@ -187,20 +191,43 @@ class _RecuperacaoSenhaScreenState extends State<RecuperacaoSenhaScreen> {
     }
   }
 
+  String get _emailDoFluxo => (_emailVerificado ?? _emailController.text).trim();
+
+  String _mensagem(Object e) => e.toString().replaceAll('Exception: ', '');
+
   Future<bool> _verificarTokenAPI() async {
-    // TODO: Implementar chamada à API
-    // Por enquanto, validação básica
-    return _tokenController.text.length == 6;
+    _ultimoErroApi = null;
+    try {
+      await _api.verificarCodigoRecuperacao(
+        email: _emailDoFluxo,
+        codigo: _tokenController.text.trim(),
+      );
+      return true;
+    } catch (e) {
+      _ultimoErroApi = _mensagem(e);
+      return false;
+    }
   }
 
   Future<bool> _resetarSenhaAPI() async {
-    // TODO: Implementar chamada à API
-    return true;
+    _ultimoErroApi = null;
+    try {
+      await _api.resetarSenha(
+        email: _emailDoFluxo,
+        codigo: _tokenController.text.trim(),
+        novaSenha: _novaSenhaController.text,
+      );
+      return true;
+    } catch (e) {
+      _ultimoErroApi = _mensagem(e);
+      return false;
+    }
   }
 
   void _iniciarContagem() {
     Future.doWhile(() async {
       await Future.delayed(const Duration(seconds: 1));
+      if (!mounted) return false; // tela fechada: para o contador
       
       if (mounted) {
         setState(() {

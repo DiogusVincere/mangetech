@@ -21,7 +21,25 @@ class ChamadoDetailScreen extends StatefulWidget {
 }
 
 class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
-  
+  bool _buscando = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Aberto a partir do ativo/QR: o chamado pode não estar na lista carregada.
+    _buscando = Provider.of<ChamadoProvider>(context, listen: false)
+            .getChamadoById(widget.chamadoId) ==
+        null;
+    if (_buscando) {
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+        await Provider.of<ChamadoProvider>(context, listen: false)
+            .fetchChamadoById(widget.chamadoId);
+        if (mounted) setState(() => _buscando = false);
+      });
+    }
+  }
+
   Future<void> _navigateToEdit(Chamado chamado) async {
     final result = await Navigator.of(context).push(
       MaterialPageRoute(
@@ -32,7 +50,7 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
     if (result == true && mounted) {
       final provider = Provider.of<ChamadoProvider>(context, listen: false);
       await provider.fetchChamadoById(widget.chamadoId);
-      setState(() {});
+      if (mounted) setState(() {});
     }
   }
 
@@ -40,6 +58,13 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
   Widget build(BuildContext context) {
     final provider = Provider.of<ChamadoProvider>(context);
     final chamado = provider.getChamadoById(widget.chamadoId);
+
+    if (chamado == null && _buscando) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Detalhes do Chamado')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     if (chamado == null) {
       return Scaffold(
@@ -99,7 +124,7 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
         onRefresh: () async {
           final provider = Provider.of<ChamadoProvider>(context, listen: false);
           await provider.fetchChamadoById(widget.chamadoId);
-          setState(() {});
+          if (mounted) setState(() {});
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -515,11 +540,11 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
   void _showAddComentarioDialog(Chamado chamado) {
     final controller = TextEditingController();
     final List<File> selectedFiles = [];
-    
+
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) {
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
           return AlertDialog(
             title: const Text('Adicionar Comentário'),
             content: SingleChildScrollView(
@@ -538,7 +563,7 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
                     autofocus: true,
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // Botões de anexo
                   Row(
                     children: [
@@ -575,7 +600,7 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
                       ),
                     ],
                   ),
-                  
+
                   // Lista de anexos selecionados
                   if (selectedFiles.isNotEmpty) ...[
                     const SizedBox(height: 16),
@@ -637,33 +662,43 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () => Navigator.of(dialogContext).pop(),
                 child: const Text('Cancelar'),
               ),
               ElevatedButton(
                 onPressed: () async {
-                  if (controller.text.trim().isNotEmpty || selectedFiles.isNotEmpty) {
-                    Navigator.of(context).pop();
-                    
+                  // A API exige texto; as fotos vão junto com ele.
+                  if (controller.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Escreva o comentário (as fotos vão junto com ele).'),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                    return;
+                  }
+                  {
+                    Navigator.of(dialogContext).pop();
+
                     // Mostrar loading
                     showDialog(
                       context: context,
                       barrierDismissible: false,
-                      builder: (context) => const Center(
+                      builder: (_) => const Center(
                         child: CircularProgressIndicator(),
                       ),
                     );
-                    
+
                     final provider = Provider.of<ChamadoProvider>(context, listen: false);
                     final success = await provider.adicionarComentario(
                       chamadoId: chamado.id,
                       texto: controller.text.trim(),
                       anexos: selectedFiles.isNotEmpty ? selectedFiles : null,
                     );
-                    
+
                     if (mounted) {
                       Navigator.pop(context); // Fecha loading
-                      
+
                       if (success) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -675,8 +710,8 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
                         setState(() {});
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Erro ao adicionar comentário'),
+                          SnackBar(
+                            content: Text(provider.error ?? 'Erro ao adicionar comentário'),
                             backgroundColor: Colors.red,
                             behavior: SnackBarBehavior.floating,
                           ),
@@ -703,7 +738,7 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
         maxHeight: 1080,
         imageQuality: 85,
       );
-      
+
       if (pickedFile != null) {
         return File(pickedFile.path);
       }
@@ -726,10 +761,10 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
   void _showMudarStatusDialog(Chamado chamado) {
     String novoStatus = chamado.status;
     final controller = TextEditingController();
-    
+
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Mudar Status'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -768,32 +803,39 @@ class _ChamadoDetailScreenState extends State<ChamadoDetailScreen> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () => Navigator.of(dialogContext).pop(),
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (controller.text.trim().isNotEmpty) {
-                Navigator.of(context).pop();
-                
-                final provider = Provider.of<ChamadoProvider>(context, listen: false);
-                final success = await provider.mudarStatus(
-                  chamadoId: chamado.id,
-                  novoStatus: novoStatus,
-                  descricao: controller.text.trim(),
+              // A API exige pelo menos 10 caracteres explicando a mudança.
+              if (controller.text.trim().length < 10) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Descreva a mudança com pelo menos 10 caracteres.'),
+                    behavior: SnackBarBehavior.floating,
+                  ),
                 );
-                
-                if (success && mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Status alterado!'),
-                      backgroundColor: Colors.green,
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
-                  setState(() {});
-                }
+                return;
               }
+              Navigator.of(dialogContext).pop();
+
+              final provider = Provider.of<ChamadoProvider>(context, listen: false);
+              final success = await provider.mudarStatus(
+                chamadoId: chamado.id,
+                novoStatus: novoStatus,
+                descricao: controller.text.trim(),
+              );
+              if (!mounted) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(success ? 'Status alterado!' : (provider.error ?? 'Erro ao mudar status')),
+                  backgroundColor: success ? Colors.green : Colors.red,
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              if (success) setState(() {});
             },
             child: const Text('Confirmar'),
           ),

@@ -16,7 +16,7 @@ class PerfilScreen extends StatefulWidget {
 
 class _PerfilScreenState extends State<PerfilScreen> {
   final ApiService _apiService = ApiService();
-  
+
   bool _isLoading = true;
   Map<String, dynamic>? _profileData;
   Map<String, dynamic>? _estatisticas;
@@ -37,12 +37,12 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
   Future<void> _loadProfileData() async {
     debugPrint('📥 _loadProfileData: Iniciando');
-    
+
     if (!mounted) {
       debugPrint('_loadProfileData: Widget NÃO montado');
       return;
     }
-    
+
     setState(() {
       debugPrint('📝 setState: loading=true');
       _isLoading = true;
@@ -71,9 +71,9 @@ class _PerfilScreenState extends State<PerfilScreen> {
       });
     } catch (e) {
       debugPrint('❌ ERRO: $e');
-      
+
       if (!mounted) return;
-      
+
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -94,7 +94,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
   void _showEditarPerfilDialog() {
     debugPrint('✏️ Abrindo dialog editar');
-    
+
     final nomeController = TextEditingController(
       text: _profileData?['first_name']?.toString() ?? '',
     );
@@ -149,30 +149,35 @@ class _PerfilScreenState extends State<PerfilScreen> {
             child: const Text('Cancelar'),
           ),
           ElevatedButton(
-            onPressed: () {
-              debugPrint('Salvar pressionado - mounted=$mounted');
-              
-              if (mounted) {
-                debugPrint('📝 Chamando setState');
-                setState(() {
-                  if (_profileData != null) {
-                    _profileData!['first_name'] = nomeController.text.trim();
-                    _profileData!['username'] = usuarioController.text.trim();
-                    _profileData!['email'] = emailController.text.trim();
-                  }
-                });
-              }
+            onPressed: () async {
+              // Antes só mudava a tela; agora grava na API.
               Navigator.pop(ctx);
-              _showSnackBar('Perfil atualizado!');
+              try {
+                final atualizado = await _apiService.atualizarPerfil(
+                  firstName: nomeController.text.trim(),
+                  username: usuarioController.text.trim(),
+                  email: emailController.text.trim(),
+                );
+                if (!mounted) return;
+                setState(() {
+                  _profileData = {...?_profileData, ...atualizado};
+                });
+                _showSnackBar('Perfil atualizado!');
+              } catch (e) {
+                _showSnackBar(e.toString().replaceAll('Exception: ', ''), isError: true);
+              }
             },
             child: const Text('Salvar'),
           ),
         ],
       ),
     ).then((_) {
-      nomeController.dispose();
-      usuarioController.dispose();
-      emailController.dispose();
+      // Espera a animação de saída do diálogo antes de liberar os campos.
+      Future.delayed(const Duration(milliseconds: 400), () {
+        nomeController.dispose();
+        usuarioController.dispose();
+        emailController.dispose();
+      });
     });
   }
 
@@ -365,7 +370,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
 
   Widget _buildStatisticsCard() {
     int total = 0, abertos = 0, andamento = 0, concluidos = 0;
-    
+
     final porStatus = _estatisticas?['por_status'];
     if (porStatus is List) {
       for (var item in porStatus) {
@@ -378,7 +383,7 @@ class _PerfilScreenState extends State<PerfilScreen> {
         if (status.contains('CONCLU')) concluidos = t;
       }
     }
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -537,6 +542,35 @@ class _AlterarSenhaDialogState extends State<_AlterarSenhaDialog> {
   final _nova = TextEditingController();
   final _confirma = TextEditingController();
   bool _obscure1 = true, _obscure2 = true, _obscure3 = true;
+  bool _salvando = false;
+  String? _erro;
+
+  Future<void> _salvar() async {
+    if (_nova.text.length < 6) {
+      setState(() => _erro = 'A nova senha precisa ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (_nova.text != _confirma.text) {
+      setState(() => _erro = 'As senhas não conferem.');
+      return;
+    }
+    setState(() {
+      _salvando = true;
+      _erro = null;
+    });
+    try {
+      await ApiService().alterarSenha(senhaAtual: _atual.text, novaSenha: _nova.text);
+      if (!mounted) return;
+      Navigator.pop(context);
+      widget.onSuccess();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _salvando = false;
+        _erro = e.toString().replaceAll('Exception: ', '');
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -589,6 +623,10 @@ class _AlterarSenhaDialogState extends State<_AlterarSenhaDialog> {
                 ),
               ),
             ),
+            if (_erro != null) ...[
+              const SizedBox(height: 12),
+              Text(_erro!, style: const TextStyle(color: Colors.red)),
+            ],
           ],
         ),
       ),
@@ -598,11 +636,9 @@ class _AlterarSenhaDialogState extends State<_AlterarSenhaDialog> {
           child: const Text('Cancelar'),
         ),
         ElevatedButton(
-          onPressed: () {
-            Navigator.pop(context);
-            widget.onSuccess();
-          },
-          child: const Text('Alterar'),
+          style: ElevatedButton.styleFrom(minimumSize: const Size(88, 44)),
+          onPressed: _salvando ? null : _salvar,
+          child: Text(_salvando ? 'Salvando...' : 'Alterar'),
         ),
       ],
     );

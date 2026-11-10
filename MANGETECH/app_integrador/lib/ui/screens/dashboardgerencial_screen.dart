@@ -31,7 +31,7 @@ class _DashboardGerencialScreenState extends State<DashboardGerencialScreen> {
     });
 
     try {
-      final data = await _apiService.getDashboardGerencial();
+      final data = await _apiService.getDashboardGerencial(dias: int.tryParse(_selectedPeriod));
       
       if (mounted) {
         setState(() {
@@ -345,6 +345,16 @@ Widget _buildKPICardFixedHeight({
     final porStatus = _dashboardData!['por_status'] as Map<String, dynamic>;
     
     final total = porStatus.values.fold<int>(0, (sum, value) => sum + (value as int));
+
+    // Sem chamados no período o gráfico de pizza recebia só zeros (NaN%).
+    if (total == 0) {
+      return const Card(
+        child: Padding(
+          padding: EdgeInsets.all(24),
+          child: Center(child: Text('Nenhum chamado no período.')),
+        ),
+      );
+    }
     
     return Card(
       child: Padding(

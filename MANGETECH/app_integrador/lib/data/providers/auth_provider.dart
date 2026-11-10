@@ -55,7 +55,7 @@ class AuthProvider with ChangeNotifier {
       
       if (response['success'] == true) {
         _isAuthenticated = true;
-        _userName = response['user']['first_name'] ?? nome;
+        _userName = response['user']['nome'] ?? response['user']['first_name'] ?? nome;
         _userEmail = email;
         _userId = response['user']['id'].toString();
         
@@ -98,7 +98,7 @@ class AuthProvider with ChangeNotifier {
         // Extrair dados do usuário
         final user = response['user'];
         _userId = user['id'].toString();
-        _userName = user['first_name'] ?? user['username'];
+        _userName = user['nome'] ?? user['username'];
         _userEmail = user['email'];
         
         _isLoading = false;
@@ -163,7 +163,7 @@ class AuthProvider with ChangeNotifier {
       
       if (profile.isNotEmpty) {
         _userId = profile['id'].toString();
-        _userName = profile['first_name'] ?? profile['username'];
+        _userName = profile['nome'] ?? profile['username'];
         _userEmail = profile['email'];
         notifyListeners();
       }
