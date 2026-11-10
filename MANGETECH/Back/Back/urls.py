@@ -5,6 +5,20 @@ from django.http import JsonResponse
 from django.urls import include, path, re_path
 from django.views.static import serve
 
+# Tipos que o navegador pode exibir direto; o resto (HTML, SVG, PDF...) vai
+# como download em sandbox, para um anexo não rodar script na origem da API.
+TIPOS_EXIBIVEIS = {'image/png', 'image/jpeg', 'image/gif', 'image/webp'}
+
+
+def servir_upload(request, path):
+    response = serve(request, path, document_root=settings.MEDIA_ROOT)
+    response['X-Content-Type-Options'] = 'nosniff'
+    tipo = (response.get('Content-Type') or '').split(';')[0].strip().lower()
+    if tipo not in TIPOS_EXIBIVEIS:
+        response['Content-Disposition'] = 'attachment'
+        response['Content-Security-Policy'] = 'sandbox'
+    return response
+
 
 def health(request):
     return JsonResponse({'status': 'ok'})
@@ -21,5 +35,5 @@ urlpatterns = [
 # houver um Nginx/CDN na frente.
 if settings.SERVE_MEDIA:
     urlpatterns += [
-        re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
+        re_path(r'^media/(?P<path>.*)$', servir_upload),
     ]

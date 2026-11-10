@@ -109,7 +109,7 @@ router.beforeEach(async (to) => {
     return home
   }
 
-  if (to.matched.some((r) => r.meta.requiresStaff) && !authStore.isAdmin) {
+  if (to.matched.some((r) => r.meta.requiresStaff) && authStore.user && !authStore.isAdmin) {
     // A raiz é o dashboard; quem não é staff começa pelos chamados, sem aviso.
     if (to.name !== 'Dashboard') {
       uiStore.showToast('error', 'Esta área é restrita aos administradores.')

@@ -181,7 +181,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { AlertCircle, ArrowLeft, Pencil, QrCode, Trash2, Wrench } from 'lucide-vue-next'
-import { assetsApi, extractError } from '@/api'
+import { assetsApi, extractError, extractFieldErrors } from '@/api'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 import type { Asset, AssetTask } from '@/types'
@@ -257,12 +257,7 @@ const save = async (payload: Record<string, any>) => {
     uiStore.showToast('success', 'Ativo atualizado.')
   } catch (err: any) {
     serverError.value = extractError(err, 'Não foi possível salvar.')
-    const data = err?.response?.data || {}
-    fieldErrors.value = Object.fromEntries(
-      Object.entries(data)
-        .filter(([, v]) => Array.isArray(v))
-        .map(([k, v]) => [k, String((v as string[])[0])])
-    )
+    fieldErrors.value = extractFieldErrors(err)
   } finally {
     saving.value = false
   }

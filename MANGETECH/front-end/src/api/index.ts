@@ -11,7 +11,7 @@ import type {
   UserStats,
 } from '@/types'
 
-export { default as api, API_URL, extractError, downloadBlob } from './client'
+export { default as api, API_URL, extractError, extractFieldErrors, downloadBlob } from './client'
 
 /** Remove filtros vazios para não mandar `?status=&search=` à API. */
 function clean(params?: Record<string, any>) {

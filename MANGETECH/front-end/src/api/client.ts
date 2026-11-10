@@ -65,6 +65,17 @@ export function extractError(error: any, fallback = 'Algo deu errado. Tente nova
   return fallback
 }
 
+/** Erros por campo da API ({codigo: ["..."]}) como {codigo: "..."}. */
+export function extractFieldErrors(error: any): Record<string, string> {
+  const data = error?.response?.data
+  if (!data || typeof data !== 'object') return {}
+  return Object.fromEntries(
+    Object.entries(data)
+      .filter(([, v]) => Array.isArray(v) && v.length)
+      .map(([k, v]) => [k, String((v as unknown[])[0])])
+  )
+}
+
 /** Baixa um Blob como arquivo. */
 export function downloadBlob(blob: Blob, filename: string) {
   const url = window.URL.createObjectURL(blob)

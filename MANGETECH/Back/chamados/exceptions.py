@@ -6,20 +6,20 @@ from rest_framework.response import Response
 from rest_framework.views import exception_handler
 
 
-def _primeira_mensagem(dados):
+def primeira_mensagem(dados):
     if isinstance(dados, dict):
         if 'message' in dados:
             return str(dados['message'])
         if 'detail' in dados:
             return str(dados['detail'])
         for valor in dados.values():
-            texto = _primeira_mensagem(valor)
+            texto = primeira_mensagem(valor)
             if texto:
                 return texto
         return ''
     if isinstance(dados, (list, tuple)):
         for valor in dados:
-            texto = _primeira_mensagem(valor)
+            texto = primeira_mensagem(valor)
             if texto:
                 return texto
         return ''
@@ -39,7 +39,7 @@ def tratar_excecao(exc, context):
     dados = response.data
     if isinstance(dados, dict):
         dados.setdefault('success', False)
-        dados.setdefault('message', _primeira_mensagem(dados))
+        dados.setdefault('message', primeira_mensagem(dados))
     elif isinstance(dados, list):
-        response.data = {'success': False, 'message': _primeira_mensagem(dados), 'errors': dados}
+        response.data = {'success': False, 'message': primeira_mensagem(dados), 'errors': dados}
     return response

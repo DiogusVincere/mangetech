@@ -72,7 +72,9 @@ class Chamado(models.Model):
         return f"#{self.id} - {self.titulo}"
 
     def save(self, *args, **kwargs):
-        if self.ativo_ref_id is None and self.ativo:
+        # Só na criação: depois disso, o vínculo muda pelo serializer, e um
+        # ativo_ref = None explícito (desvincular) precisa ser respeitado.
+        if self._state.adding and self.ativo_ref_id is None and self.ativo:
             self.ativo_ref = Ativo.buscar_por_texto(self.ativo)
         elif self.ativo_ref_id and not (self.ativo or '').strip():
             self.ativo = f"{self.ativo_ref.codigo} - {self.ativo_ref.nome}"
@@ -350,7 +352,7 @@ class TokenRecuperacaoSenha(models.Model):
         """
         if not self.is_valido():
             return False
-        if not secrets.compare_digest(self.token, (token_fornecido or '').strip()):
+        if not secrets.compare_digest(self.token, str(token_fornecido or '').strip()):
             self.tentativas += 1
             self.save(update_fields=['tentativas'])
             return False

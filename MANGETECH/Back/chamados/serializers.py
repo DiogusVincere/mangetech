@@ -374,6 +374,15 @@ class AtivoSerializer(serializers.ModelSerializer):
         return obj.chamados.filter(status__in=STATUS_EM_ABERTO).count()
 
     def get_ultimo_chamado(self, obj):
+        if hasattr(obj, 'ultimo_chamado_id'):  # anotado em AtivoViewSet.get_queryset
+            if not obj.ultimo_chamado_id:
+                return None
+            return {
+                'id': str(obj.ultimo_chamado_id),
+                'titulo': obj.ultimo_chamado_titulo,
+                'status': obj.ultimo_chamado_status,
+                'data': obj.ultimo_chamado_data.strftime('%d/%m/%Y'),
+            }
         ultimo = obj.chamados.order_by('-data_criacao').first()
         if not ultimo:
             return None

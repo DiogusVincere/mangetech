@@ -31,5 +31,7 @@ services:
         value: https://integrador4-final.vercel.app,https://diogusvincere.github.io
       - key: CSRF_TRUSTED_ORIGINS
         value: https://*.onrender.com
+      - key: NUM_PROXIES
+        value: "1"
       - key: WEB_CONCURRENCY
         value: "2"

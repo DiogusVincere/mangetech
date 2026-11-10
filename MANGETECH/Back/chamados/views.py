@@ -4,7 +4,7 @@ from datetime import timedelta
 from django.contrib.auth.models import User, update_last_login
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Count, Min, Q
+from django.db.models import Count, Min, OuterRef, Q, Subquery
 from django.http import HttpResponse
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
@@ -17,6 +17,7 @@ from rest_framework.response import Response
 from rest_framework.throttling import SimpleRateThrottle
 
 from .email_service import EnviadorEmail, VerificadorEmail
+from .exceptions import primeira_mensagem as _primeiro_erro
 from .filters import AtivoFilter, ChamadoFilter
 from .models import (
     Ativo,
@@ -67,16 +68,6 @@ def _chamados_visiveis(user):
         return qs
     ids = Chamado.objects.filter(Q(solicitante=user) | Q(responsaveis=user)).values('pk')
     return qs.filter(pk__in=ids)
-
-
-def _primeiro_erro(errors):
-    """Primeira mensagem legível de um dict de erros do DRF."""
-    if isinstance(errors, dict):
-        for valor in errors.values():
-            return _primeiro_erro(valor)
-    if isinstance(errors, (list, tuple)) and errors:
-        return _primeiro_erro(errors[0])
-    return str(errors)
 
 
 def _mascarar_email(email: str) -> str:
@@ -504,7 +495,9 @@ class ChamadoViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='export')
     def export(self, request):
         """CSV com os mesmos filtros da listagem (separador ; e BOM para abrir no Excel)."""
-        queryset = self.filter_queryset(self.get_queryset())
+        queryset = self.filter_queryset(
+            _chamados_visiveis(request.user).select_related('solicitante').prefetch_related('responsaveis')
+        )
 
         response = HttpResponse(content_type='text/csv; charset=utf-8')
         response['Content-Disposition'] = (
@@ -583,9 +576,14 @@ class AtivoViewSet(viewsets.ModelViewSet):
     ordering = ['nome']
 
     def get_queryset(self):
+        ultimos = Chamado.objects.filter(ativo_ref=OuterRef('pk')).order_by('-data_criacao')
         return Ativo.objects.annotate(
             n_chamados=Count('chamados', distinct=True),
             n_chamados_abertos=Count('chamados', filter=Q(chamados__status__in=STATUS_EM_ABERTO), distinct=True),
+            **{
+                f'ultimo_chamado_{campo}': Subquery(ultimos.values(origem)[:1])
+                for campo, origem in (('id', 'pk'), ('titulo', 'titulo'), ('status', 'status'), ('data', 'data_criacao'))
+            },
         ).prefetch_related('historico_movimentacoes__usuario')
 
     def get_permissions(self):
@@ -789,7 +787,8 @@ def _tempos_resolucao(queryset):
 @permission_classes([IsAuthenticated])
 def dashboard_gerencial(request):
     """Indicadores. ?dias=N limita aos chamados abertos nos últimos N dias."""
-    queryset = _chamados_visiveis(request.user)
+    visiveis = _chamados_visiveis(request.user)
+    queryset = visiveis
     agora = timezone.now()
 
     dias = request.query_params.get('dias')
@@ -856,9 +855,10 @@ def dashboard_gerencial(request):
             'por_status': por_status,
             'por_urgencia': por_urgencia,
             'periodo': {
-                'ultimos_7_dias': queryset.filter(data_criacao__gte=agora - timedelta(days=7)).count(),
-                'ultimos_30_dias': queryset.filter(data_criacao__gte=agora - timedelta(days=30)).count(),
-                'ultimos_90_dias': queryset.filter(data_criacao__gte=agora - timedelta(days=90)).count(),
+                # Janelas fixas: independem do ?dias escolhido.
+                'ultimos_7_dias': visiveis.filter(data_criacao__gte=agora - timedelta(days=7)).count(),
+                'ultimos_30_dias': visiveis.filter(data_criacao__gte=agora - timedelta(days=30)).count(),
+                'ultimos_90_dias': visiveis.filter(data_criacao__gte=agora - timedelta(days=90)).count(),
             },
             'tempo_resolucao': tempo_resolucao,
             'criticos': ChamadoReadSerializer(

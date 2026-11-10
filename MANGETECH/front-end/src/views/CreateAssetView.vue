@@ -26,7 +26,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ArrowLeft } from 'lucide-vue-next'
-import { assetsApi, extractError } from '@/api'
+import { assetsApi, extractError, extractFieldErrors } from '@/api'
 import { useUiStore } from '@/stores/ui'
 import AssetForm from '@/components/AssetForm.vue'
 
@@ -47,12 +47,7 @@ const create = async (payload: Record<string, any>) => {
     router.push({ path: `/assets/${ativo.id}`, query: { qr: '1' } })
   } catch (err: any) {
     serverError.value = extractError(err, 'Não foi possível cadastrar o ativo.')
-    const data = err?.response?.data || {}
-    fieldErrors.value = Object.fromEntries(
-      Object.entries(data)
-        .filter(([, v]) => Array.isArray(v))
-        .map(([k, v]) => [k, String((v as string[])[0])])
-    )
+    fieldErrors.value = extractFieldErrors(err)
   } finally {
     saving.value = false
   }

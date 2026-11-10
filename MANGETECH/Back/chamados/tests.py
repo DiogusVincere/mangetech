@@ -133,6 +133,11 @@ class AuthTests(Base):
         self.assertEqual(r.status_code, 400)
         self.assertTrue(r.json().get('token_expirado'))
 
+    def test_codigo_numerico_no_json_nao_quebra(self):
+        self.client.post('/api/auth/solicitar-recuperacao-senha/', {'email': 'tec@x.com'}, format='json')
+        r = self.client.post('/api/auth/verificar-token-recuperacao/', {'email': 'tec@x.com', 'token': 1}, format='json')
+        self.assertEqual(r.status_code, 400)
+
     def test_verificar_email_sem_travar(self):
         with mock.patch('chamados.email_service.VerificadorEmail.validar_dominio', return_value=False):
             r = self.client.post('/api/auth/verificar-email/', {'email': 'a@dominio-que-nao-existe.zz'}, format='json')
@@ -259,6 +264,23 @@ class ChamadoTests(Base):
         r = self.client.get('/api/chamados/?page_size=1')
         self.assertEqual(len(r.json()['results']), 1)
 
+    def test_desvincular_ativo_e_respeitado(self):
+        c = self.criar_chamado(ativo='AST-001 - Compressor')
+        r = self.client.patch(f"/api/chamados/{c['id']}/", {'ativo_ref': None}, format='json')
+        self.assertEqual(r.status_code, 200, r.content)
+        self.assertIsNone(r.json()['ativo_ref'])
+        self.assertIsNone(Chamado.objects.get(pk=c['id']).ativo_ref_id)
+
+    def test_anexo_html_baixa_em_vez_de_abrir(self):
+        c = self.criar_chamado()
+        arquivo = SimpleUploadedFile('x.html', b'<script>alert(1)</script>', content_type='text/html')
+        r = self.client.post(f"/api/chamados/{c['id']}/adicionar_anexo/", {'arquivo': arquivo}, format='multipart')
+        caminho = r.json()['anexo']['url'].split('://', 1)[1].split('/', 1)[1]
+        r = self.client.get('/' + caminho)
+        self.assertEqual(r['Content-Disposition'], 'attachment')
+        self.assertEqual(r['X-Content-Type-Options'], 'nosniff')
+        self.assertEqual(r['Content-Security-Policy'], 'sandbox')
+
     def test_atrasado(self):
         self.criar_chamado(data_sugerida=(timezone.now() - timedelta(days=1)).isoformat())
         r = self.client.get('/api/chamados/?atrasados=true')
@@ -316,6 +338,8 @@ class AtivoTests(Base):
         r = self.client.get('/api/ativos/')
         por_codigo = {a['codigo']: a for a in r.json()['results']}
         self.assertEqual(por_codigo['AST-001']['total_chamados'], 1)
+        self.assertEqual(por_codigo['AST-001']['ultimo_chamado']['titulo'], 'Compressor parado')
+        self.assertIsNone(por_codigo['AST-0010']['ultimo_chamado'])
         self.assertEqual(por_codigo['AST-0010']['total_chamados'], 0)
 
 
@@ -343,6 +367,11 @@ class UsuarioEDashboardTests(Base):
         self.assertEqual(dados['tempo_resolucao']['2_4h'], 1)
         self.assertAlmostEqual(dados['kpis']['tempo_medio_horas'], 3.0, delta=0.2)
         self.assertEqual(dados['ativos']['mais_chamados'][0]['codigo'], 'AST-001')
+        # Janelas fixas não encolhem com ?dias.
+        Chamado.objects.filter(pk=c['id']).update(data_criacao=timezone.now() - timedelta(days=60))
+        dados = self.client.get('/api/dashboard/gerencial/?dias=30').json()['data']
+        self.assertEqual(dados['kpis']['total_chamados'], 0)
+        self.assertEqual(dados['periodo']['ultimos_90_dias'], 1)
 
     def test_estatisticas_com_atividades(self):
         c = self.criar_chamado(self.tec)
