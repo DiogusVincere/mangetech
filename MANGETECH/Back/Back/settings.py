@@ -103,12 +103,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'Back.wsgi.application'
 
 # Database
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+# Sem DATABASE_URL: SQLite no disco (desenvolvimento e demonstração, que
+# recomeça a cada deploy). Com DATABASE_URL (ex.: Postgres do Neon), os dados
+# ficam fora do servidor e sobrevivem a deploys e reinícios.
+DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+if DATABASE_URL:
+    import dj_database_url
+
+    DATABASES = {
+        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=60, conn_health_checks=True),
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
@@ -140,7 +151,12 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Media files (uploads: fotos de comentários, do histórico e anexos)
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-SERVE_MEDIA = _env_bool('SERVE_MEDIA', True)
+
+# Com as variáveis do Cloudflare R2, fotos e anexos vão para o bucket (privado:
+# a API devolve links assinados que valem 1 hora). Sem elas, ficam em media/.
+R2_BUCKET = os.environ.get('R2_BUCKET', '').strip()
+USAR_R2 = bool(R2_BUCKET)
+SERVE_MEDIA = _env_bool('SERVE_MEDIA', not USAR_R2)
 
 # Uploads grandes vão para arquivo temporário; acima disso o Django recusa.
 DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
@@ -149,6 +165,21 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    } if not USAR_R2 else {
+        'BACKEND': 'storages.backends.s3.S3Storage',
+        'OPTIONS': {
+            'bucket_name': R2_BUCKET,
+            'endpoint_url': os.environ.get('R2_ENDPOINT_URL')
+            or f"https://{os.environ.get('R2_ACCOUNT_ID', '')}.r2.cloudflarestorage.com",
+            'access_key': os.environ.get('R2_ACCESS_KEY_ID'),
+            'secret_key': os.environ.get('R2_SECRET_ACCESS_KEY'),
+            'region_name': 'auto',
+            'signature_version': 's3v4',
+            'default_acl': None,
+            'querystring_auth': True,
+            'querystring_expire': 3600,
+            'file_overwrite': False,
+        },
     },
     'staticfiles': {
         'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',

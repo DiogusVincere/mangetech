@@ -1,4 +1,5 @@
-# Blueprint do Render para publicar a API Django do MangeTech.
+# Blueprint do Render para publicar a API Django do MangeTech: a demonstração
+# (mangetech-api) e uma instância pessoal com dados permanentes (mangetech-pessoal).
 # Documentação: https://render.com/docs/blueprint-spec
 #
 # No plano gratuito o disco é efêmero: o SQLite e os uploads (fotos e anexos)
@@ -35,3 +36,55 @@ services:
         value: "1"
       - key: WEB_CONCURRENCY
         value: "2"
+
+  # Instância de uso real, com dados permanentes: banco Postgres no Neon
+  # (DATABASE_URL) e fotos/anexos num bucket privado do Cloudflare R2. Não roda o
+  # seed_demo; o primeiro administrador vem de ADMIN_EMAIL/ADMIN_PASSWORD.
+  # As variáveis com "sync: false" são preenchidas no painel do Render (o
+  # Blueprint pede os valores ao criar o serviço). Passo a passo no README.
+  - type: web
+    name: mangetech-pessoal
+    runtime: python
+    plan: free
+    region: oregon
+    rootDir: .
+    buildCommand: pip install -r MANGETECH/Back/requirements.txt && cd MANGETECH/Back && python manage.py collectstatic --noinput
+    startCommand: cd MANGETECH/Back && python manage.py migrate && python manage.py criar_admin && gunicorn Back.wsgi:application
+    healthCheckPath: /api/health/
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: ALLOWED_HOSTS
+        value: .onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://*.onrender.com
+      - key: NUM_PROXIES
+        value: "1"
+      - key: WEB_CONCURRENCY
+        value: "2"
+      - key: DATABASE_URL
+        sync: false
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_BUCKET
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_NOME
+        sync: false
+      # URL do seu front no Vercel (ex.: https://mangetech-pessoal.vercel.app)
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      - key: FRONTEND_URL
+        sync: false

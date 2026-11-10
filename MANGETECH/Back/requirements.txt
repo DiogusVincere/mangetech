@@ -8,3 +8,8 @@ Pillow==11.3.0
 dnspython==2.8.0
 python-dotenv==1.1.1
 gunicorn==23.0.0
+# Instância com dados permanentes: Postgres (DATABASE_URL) e arquivos no R2.
+dj-database-url==2.3.0
+psycopg[binary]==3.2.10
+django-storages[s3]==1.14.4
+boto3==1.35.36
