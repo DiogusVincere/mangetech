@@ -396,3 +396,35 @@ class ModeloTests(Base):
         self.ativo.data_aquisicao = date(2023, 1, 31)
         self.ativo.garantia_meses = 1
         self.assertEqual(self.ativo.garantia_ate, date(2023, 2, 28))
+
+
+class CriarAdminTests(Base):
+    def rodar(self, **env):
+        from io import StringIO
+        from django.core.management import call_command
+        saida = StringIO()
+        with mock.patch.dict('os.environ', env, clear=False):
+            call_command('criar_admin', stdout=saida)
+        return saida.getvalue()
+
+    def test_sem_variavel_nao_faz_nada(self):
+        with mock.patch.dict('os.environ', {}, clear=True):
+            from io import StringIO
+            from django.core.management import call_command
+            saida = StringIO()
+            call_command('criar_admin', stdout=saida)
+        self.assertIn('nenhum administrador', saida.getvalue())
+
+    def test_cria_uma_vez_e_mantem_senha(self):
+        from django.core.management.base import CommandError
+        with self.assertRaises(CommandError):
+            self.rodar(ADMIN_EMAIL='chefe@x.com', ADMIN_PASSWORD='123456')
+        self.rodar(ADMIN_EMAIL='Chefe@x.com', ADMIN_PASSWORD='Manutencao#2026', ADMIN_NOME='Maria Silva')
+        chefe = User.objects.get(email='chefe@x.com')
+        self.assertTrue(chefe.is_superuser and chefe.is_staff)
+        self.assertEqual(chefe.first_name, 'Maria')
+        chefe.set_password('OutraSenha#99')
+        chefe.save()
+        self.assertIn('já existe', self.rodar(ADMIN_EMAIL='chefe@x.com', ADMIN_PASSWORD='Manutencao#2026'))
+        chefe.refresh_from_db()
+        self.assertTrue(chefe.check_password('OutraSenha#99'))

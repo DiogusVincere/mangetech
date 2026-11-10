@@ -126,6 +126,40 @@ flutter run --dart-define=API_URL=http://10.0.2.2:8000/api
 
 As senhas são públicas de propósito. O comando pode rodar mais de uma vez: não duplica nada.
 
+## Instância pessoal (dados permanentes)
+
+A demonstração (`mangetech-api`) recomeça a cada deploy de propósito. Para uso de verdade existe um segundo serviço no [`render.yaml`](render.yaml), o `mangetech-pessoal`, que guarda o banco no **Neon** (Postgres gratuito) e as fotos/anexos num bucket privado do **Cloudflare R2**. Ele não carrega os dados de demonstração e cria o seu administrador a partir de variáveis de ambiente.
+
+A API decide pelo ambiente: com `DATABASE_URL` usa Postgres (sem ela, SQLite); com `R2_BUCKET` e as chaves do R2 guarda os arquivos no bucket e devolve links assinados que valem 1 hora (sem elas, usa a pasta `media/`).
+
+**1. Banco no Neon**
+1. Crie um projeto em <https://neon.tech> (plano gratuito). Escolha a região **AWS US West (Oregon)**, a mesma do Render, para a API responder mais rápido.
+2. Em *Connection Details*, copie a *connection string* **sem pooling** (a que não tem `-pooler` no host). Ela tem a forma `postgresql://usuario:senha@ep-....neon.tech/neondb?sslmode=require`. Esse é o `DATABASE_URL`.
+
+**2. Arquivos no Cloudflare R2**
+1. No painel da Cloudflare: *R2 Object Storage* → *Create bucket* (ex.: `mangetech-pessoal`). Deixe o bucket **privado** (o padrão).
+2. *Manage R2 API Tokens* → *Create API token* com permissão **Object Read & Write** só nesse bucket. Guarde o *Access Key ID* e o *Secret Access Key* (o segredo aparece uma vez só).
+3. Anote o *Account ID* da conta (aparece na página do R2). Ficam: `R2_BUCKET`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`.
+
+**3. API no Render**
+1. Com este código na `main`, abra o Blueprint do repositório no Render (*Blueprints* → o blueprint do MangeTech → *Sync*/*Manual sync*). Se a demonstração não foi criada por Blueprint, use *New* → *Blueprint* e escolha o repositório; o Render mostra os dois serviços e cria o que falta.
+2. Preencha as variáveis que o Render pedir para o `mangetech-pessoal`: `DATABASE_URL`, as quatro do R2, `ADMIN_EMAIL`, `ADMIN_PASSWORD` (forte: a API recusa senhas comuns ou só numéricas), `ADMIN_NOME`. `CORS_ALLOWED_ORIGINS` e `FRONTEND_URL` podem ficar para o passo 4.
+3. No primeiro início ele cria as tabelas no Neon e o seu usuário administrador. Teste em `https://mangetech-pessoal.onrender.com/api/health/` (o nome exato aparece no painel).
+
+O administrador só é criado se ainda não existir; depois você troca a senha pelo perfil normalmente e ela não é sobrescrita.
+
+**4. Front no Vercel**
+1. *Add New* → *Project* → importe este repositório de novo, com **Root Directory** `MANGETECH/front-end`.
+2. Em *Environment Variables*, crie `VITE_API_URL` = `https://mangetech-pessoal.onrender.com/api` e faça o deploy.
+3. Volte ao Render e preencha no `mangetech-pessoal`: `CORS_ALLOWED_ORIGINS` = a URL do Vercel (ex.: `https://mangetech-pessoal.vercel.app`) e `FRONTEND_URL` = a mesma URL.
+
+**5. App Android**
+No GitHub: *Actions* → *APK (Android)* → *Run workflow* → informe `api_url` = `https://mangetech-pessoal.onrender.com/api`. O APK sai como artefato `mangetech-apk-main-pessoal`.
+
+**Opcional: e-mail de recuperação de senha.** Sem SMTP, o código de 6 dígitos só aparece nos logs do Render. Para receber por e-mail, crie no `mangetech-pessoal` as variáveis `EMAIL_HOST_USER` e `EMAIL_HOST_PASSWORD` (no Gmail, uma *senha de app*).
+
+**Bom saber:** os dois serviços gratuitos do Render dormem sem uso (uns 30 s para acordar) e dividem as horas gratuitas do mês, mas dormindo não gastam. O Neon gratuito guarda os dados sem prazo, com limite de espaço pequeno (suficiente para uso pessoal) e restauração de poucas horas para trás; para cópia de segurança, rode de vez em quando `pg_dump "$DATABASE_URL" > backup.sql`. Confira limites e preços atuais nos sites do Neon, da Cloudflare e do Render.
+
 ## API: endpoints principais
 
 Todos sob `/api/`, com `Authorization: Token <token>` (exceto `auth/*` e `health/`). Listagens são paginadas (`?page=`, `?page_size=` até 1000) e erros vêm com um campo `message` legível.
