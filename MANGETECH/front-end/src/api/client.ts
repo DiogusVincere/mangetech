@@ -1,333 +1,80 @@
-// src/api/client.ts
+// src/api/client.ts — instância do axios, token e tratamento de erros
 import axios from 'axios'
 
-// ===== CONFIGURAÇÃO BASE DO AXIOS =====
 // URL da API: defina VITE_API_URL no .env do front (ver .env.example).
-// Sem a variável, usa a URL que estava publicada no Azure.
-export const API_URL: string =
+// Sem a variável, usa a API publicada no Render.
+export const API_URL: string = (
   import.meta.env.VITE_API_URL || 'https://mangetech-api.onrender.com/api'
+).replace(/\/+$/, '')
 
 const api = axios.create({
   baseURL: API_URL,
-  timeout: 30000,
-  headers: {
-    'Content-Type': 'application/json'
-  }
+  timeout: 60000, // o Render gratuito leva ~30 s para acordar
 })
 
-// ===== INTERCEPTOR: Adicionar token em todas as requisições =====
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('token')
-    if (token) {
-      config.headers.Authorization = `Token ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
+export const TOKEN_KEY = 'token'
+export const USER_KEY = 'user'
 
-// ===== INTERCEPTOR: Tratar erros globalmente =====
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (token) {
+    config.headers.Authorization = `Token ${token}`
+  }
+  return config
+})
+
+// 401 com token salvo = sessão expirada: limpa e volta para o login.
+// (401 no próprio login é "senha errada" e precisa chegar até a tela.)
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token inválido ou expirado
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+    const url: string = error.config?.url || ''
+    const tinhaToken = !!error.config?.headers?.Authorization
+    if (error.response?.status === 401 && tinhaToken && !url.includes('/auth/')) {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(USER_KEY)
+      if (!window.location.pathname.startsWith('/login')) {
+        const destino = encodeURIComponent(window.location.pathname + window.location.search)
+        window.location.href = `/login?redirect=${destino}&expirou=1`
+      }
     }
     return Promise.reject(error)
   }
 )
 
-// ===== TASKS API (CHAMADOS) =====
-export const tasksApi = {
-  // Listar todos os chamados
-  async getAll(filters?: any) {
-    const params = new URLSearchParams()
-    if (filters?.search) params.append('search', filters.search)
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.urgencia) params.append('urgencia', filters.urgencia)
-    if (filters?.solicitante) params.append('solicitante', filters.solicitante)
-    if (filters?.data_inicio) params.append('data_criacao_after', filters.data_inicio)
-    if (filters?.data_fim) params.append('data_criacao_before', filters.data_fim)
-    
-    const response = await api.get(`/chamados/?${params.toString()}`)
-    return response.data
-  },
-
-  // Buscar chamado por ID
-  async getById(id: number | string) {
-    const response = await api.get(`/chamados/${id}/`)
-    return response.data
-  },
-
-  // Criar novo chamado
-  async create(taskData: any) {
-    const response = await api.post('/chamados/', taskData)
-    return response.data
-  },
-
-  // Atualizar chamado
-  async update(id: number | string, taskData: any) {
-    const response = await api.patch(`/chamados/${id}/`, taskData)
-    return response.data
-  },
-
-  // Deletar chamado
-  async delete(id: number | string) {
-    const response = await api.delete(`/chamados/${id}/`)
-    return response.data
-  },
-
-  // Mudar status do chamado (com FormData para fotos)
-  async changeStatus(id: number | string, formData: FormData) {
-    const response = await api.post(`/chamados/${id}/mudar_status/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    return response.data
-  },
-
-  // Adicionar comentário (com FormData para fotos)
-  async addComment(id: number | string, formData: FormData) {
-    const response = await api.post(`/chamados/${id}/adicionar_comentario/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    return response.data
-  },
-
-  // Adicionar anexo
-  async addAttachment(id: number | string, file: File) {
-    const formData = new FormData()
-    formData.append('arquivo', file)
-    
-    const response = await api.post(`/chamados/${id}/adicionar_anexo/`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
-    })
-    return response.data
-  },
-
-  // Buscar estatísticas
-  async getStatistics() {
-    const response = await api.get('/chamados/estatisticas/')
-    return response.data
-  },
-
-  // Buscar estatísticas filtradas
-  async getFilteredStatistics(filters?: any) {
-    const params = new URLSearchParams()
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.urgencia) params.append('urgencia', filters.urgencia)
-    
-    const response = await api.get(`/chamados/estatisticas_filtradas/?${params.toString()}`)
-    return response.data
-  },
-
-  // Exportar CSV
-  async exportCSV(filters?: any) {
-    const params = new URLSearchParams()
-    if (filters?.search) params.append('search', filters.search)
-    if (filters?.status) params.append('status', filters.status)
-    if (filters?.urgencia) params.append('urgencia', filters.urgencia)
-    
-    const response = await api.get(`/chamados/export/?${params.toString()}`, {
-      responseType: 'blob'
-    })
-    return response.data
-  },
-
-  // Deletar múltiplos chamados
-  async bulkDelete(ids: number[]) {
-    const response = await api.post('/chamados/bulk-delete/', { ids })
-    return response.data
+/** Mensagem legível de um erro do axios (a API devolve `message`). */
+export function extractError(error: any, fallback = 'Algo deu errado. Tente novamente.'): string {
+  if (!error) return fallback
+  if (error.code === 'ECONNABORTED') return 'O servidor demorou para responder. Tente de novo.'
+  if (error.message === 'Network Error' || !error.response) {
+    return 'Não foi possível falar com o servidor. Verifique a conexão.'
   }
-}
-
-// ===== ASSETS API (ATIVOS) =====
-export const assetsApi = {
-  // Listar todos os ativos
-  async getAll(filters?: any) {
-    const params = new URLSearchParams()
-    if (filters?.search) params.append('search', filters.search)
-    if (filters?.status) params.append('status', filters.status)
-    
-    const response = await api.get(`/ativos/?${params.toString()}`)
-    return response.data
-  },
-
-  // Buscar ativo por ID
-  async getById(id: number | string) {
-    const response = await api.get(`/ativos/${id}/`)
-    return response.data
-  },
-
-  // Criar novo ativo
-  async create(assetData: any) {
-    const response = await api.post('/ativos/', assetData)
-    return response.data
-  },
-
-  // Atualizar ativo
-  async update(id: number | string, assetData: any) {
-    const response = await api.patch(`/ativos/${id}/`, assetData)
-    return response.data
-  },
-
-  // Deletar ativo
-  async delete(id: number | string) {
-    const response = await api.delete(`/ativos/${id}/`)
-    return response.data
-  },
-
-  // Buscar chamados relacionados ao ativo
-  async getTasks(id: number | string) {
-    const response = await api.get(`/ativos/${id}/chamados/`)
-    return response.data.chamados || []
-  },
-
-  // Gerar QR Code do ativo
-  async getQRCode(id: number | string) {
-    const response = await api.get(`/ativos/${id}/qr-code/`)
-    return response.data
-  },
-
-  // Adicionar histórico ao ativo
-  async addHistory(id: number | string, tipo: string, descricao: string) {
-    const response = await api.post(`/ativos/${id}/adicionar_historico/`, {
-      tipo,
-      descricao
-    })
-    return response.data
-  },
-
-  // Buscar ativo por QR Code
-  async getByQRCode(codigo: string) {
-    const response = await api.get(`/ativos/${codigo}/por_qrcode/`)
-    return response.data
+  const data = error.response.data
+  if (data && typeof data === 'object') {
+    if (typeof data.message === 'string' && data.message) return data.message
+    if (typeof data.detail === 'string' && data.detail) return data.detail
+    const errors = data.errors || data
+    for (const valor of Object.values(errors)) {
+      if (typeof valor === 'string' && valor) return valor
+      if (Array.isArray(valor) && valor.length) return String(valor[0])
+    }
   }
+  if (error.response.status === 403) return 'Você não tem permissão para fazer isso.'
+  if (error.response.status === 404) return 'Registro não encontrado.'
+  if (error.response.status >= 500) return 'Erro no servidor. Tente novamente em instantes.'
+  return fallback
 }
 
-// ===== AUTH API (AUTENTICAÇÃO) =====
-export const authApi = {
-  // Login
-  async login(email: string, senha: string) {
-    const response = await api.post('/auth/login/', { email, senha })
-    return response.data
-  },
-
-  // Registro
-  async register(nome: string, email: string, senha: string) {
-    const response = await api.post('/auth/register/', { nome, email, senha })
-    return response.data
-  },
-
-  // Logout
-  async logout() {
-    const response = await api.post('/auth/logout/')
-    return response.data
-  },
-
-  // Solicitar recuperação de senha
-  async requestPasswordReset(email: string) {
-    const response = await api.post('/auth/solicitar-recuperacao-senha/', { email })
-    return response.data
-  },
-
-  // Verificar token de recuperação
-  async verifyResetToken(email: string, token: string) {
-    const response = await api.post('/auth/verificar-token-recuperacao/', { email, token })
-    return response.data
-  },
-
-  // Resetar senha
-  async resetPassword(email: string, token: string, nova_senha: string, confirmar_senha: string) {
-    const response = await api.post('/auth/resetar-senha/', {
-      email,
-      token,
-      nova_senha,
-      confirmar_senha
-    })
-    return response.data
-  },
-
-  // Verificar email
-  async verifyEmail(email: string) {
-    const response = await api.post('/auth/verificar-email/', { email })
-    return response.data
-  }
+/** Baixa um Blob como arquivo. */
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
 }
 
-// ===== USER API (PERFIL DO USUÁRIO) =====
-export const userApi = {
-  // Buscar perfil
-  async getProfile() {
-    const response = await api.get('/perfil/')
-    return response.data
-  },
-
-  // Atualizar perfil
-  async updateProfile(data: any) {
-    const response = await api.put('/perfil/atualizar/', data)
-    return response.data
-  },
-
-  // Alterar senha
-  async changePassword(senha_atual: string, nova_senha: string, confirmar_senha: string) {
-    const response = await api.post('/perfil/alterar-senha/', {
-      senha_atual,
-      nova_senha,
-      confirmar_senha
-    })
-    return response.data
-  },
-
-  // Buscar estatísticas do usuário
-  async getStatistics() {
-    const response = await api.get('/perfil/estatisticas/')
-    return response.data
-  },
-
-  // Listar todos os usuários
-  async getAll(search?: string) {
-    const params = search ? `?search=${search}` : ''
-    const response = await api.get(`/usuarios/${params}`)
-    return response.data
-  },
-
-  // Buscar usuário atual (me)
-  async getMe() {
-    const response = await api.get('/usuarios/me/')
-    return response.data
-  },
- 
-  // ADICIONE ISTO TAMBÉM (Atalho para estatísticas)
-  
-}
-
-// ===== DASHBOARD API =====
-export const dashboardApi = {
-  async getManagerialData() {
-    const response = await api.get('/dashboard/gerencial/')
-    return response.data
-  }
-}
-
-// ===== COMMENTS API (COMENTÁRIOS) =====
-export const commentsApi = {
-  async getAll(chamadoId?: number) {
-    const params = chamadoId ? `?chamado=${chamadoId}` : ''
-    const response = await api.get(`/comentarios/${params}`)
-    return response.data
-  },
-
-  async getById(id: number) {
-    const response = await api.get(`/comentarios/${id}/`)
-    return response.data
-  }
-}
-
-// Exportar instância do axios como default
 export default api

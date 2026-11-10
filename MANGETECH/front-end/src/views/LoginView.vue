@@ -161,6 +161,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
+import { extractError } from '@/api'
 import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-vue-next'
 import AOS from 'aos'
 import 'aos/dist/aos.css'
@@ -223,25 +224,13 @@ const handleLogin = async () => {
 
     // Redirect after success animation
     setTimeout(() => {
-      const redirect = route.query.redirect as string || '/'
-      router.push(redirect)
+      const redirect = route.query.redirect as string
+      // Só caminhos internos (evita redirecionar para outro site).
+      router.push(redirect && redirect.startsWith('/') && !redirect.startsWith('//') ? redirect : '/')
     }, 1000)
 
   } catch (error: any) {
-    console.error('Erro no login:', error)
-    
-    // Determine error message
-    if (error.response?.status === 401) {
-      errorMessage.value = 'Email ou senha incorretos. Verifique suas credenciais e tente novamente.'
-    } else if (error.response?.status === 400) {
-      errorMessage.value = error.response.data?.message || 'Dados inválidos. Verifique os campos e tente novamente.'
-    } else if (error.message === 'Network Error') {
-      errorMessage.value = 'Erro de conexão. Verifique sua internet e tente novamente.'
-    } else {
-      errorMessage.value = error.response?.data?.message || 'Erro ao fazer login. Tente novamente.'
-    }
-
-    uiStore.showToast('error', 'Erro ao fazer login')
+    errorMessage.value = extractError(error, 'Erro ao fazer login. Tente novamente.')
     buttonState.value = 'idle'
   } finally {
     loading.value = false
@@ -255,9 +244,10 @@ onMounted(() => {
     once: true
   })
 
-  // Check if user is already authenticated
   if (authStore.isAuthenticated) {
     router.push('/')
+  } else if (route.query.expirou) {
+    errorMessage.value = 'Sua sessão expirou. Entre de novo.'
   }
 })
 </script>

@@ -1,292 +1,200 @@
-<!-- src/views/CreateTaskView.vue - CORRIGIDO COM DEBUGGING -->
 <template>
-  <div class="max-w-4xl mx-auto px-4 py-6">
-    <!-- Header -->
+  <div class="max-w-4xl mx-auto">
     <div class="flex items-center mb-8">
-      <router-link to="/tasks" class="p-2 hover:bg-gray-100 rounded-lg transition mr-4">
+      <button type="button" @click="cancel" class="p-2 hover:bg-gray-100 rounded-lg transition mr-4" title="Voltar">
         <ArrowLeft :size="20" class="text-gray-600" />
-      </router-link>
+      </button>
       <div>
-        <h1 class="text-2xl font-bold text-gray-900">Criar Novo Chamado</h1>
-        <p class="text-sm text-gray-500 mt-1">Preencha as informações do chamado</p>
+        <h1 class="text-2xl font-bold text-gray-900">{{ isEdit ? `Editar chamado #${taskId}` : 'Novo chamado' }}</h1>
+        <p class="text-sm text-gray-500 mt-1">
+          {{ isEdit ? 'Altere os dados e os responsáveis. Para mudar o status, use "Mudar status" no chamado.' : 'Descreva o problema e o equipamento afetado.' }}
+        </p>
       </div>
     </div>
 
-    <!-- Form -->
-    <form @submit.prevent="handleSubmit" class="space-y-6">
-      <!-- Título -->
+    <div v-if="loadingTask" class="flex justify-center py-16">
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+
+    <form v-else @submit.prevent="handleSubmit" class="space-y-6" novalidate>
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <label for="titulo" class="block text-sm font-semibold text-gray-700 mb-2">
           Título <span class="text-red-500">*</span>
         </label>
-        <input 
-          v-model="formData.titulo" 
-          type="text" 
-          id="titulo" 
-          required 
-          minlength="5" 
-          :class="[
-            'w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition',
-            errors.titulo ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-          ]" 
-          placeholder="Descreva brevemente o problema" 
-          @blur="validateField('titulo')" 
+        <input
+          v-model="form.titulo"
+          id="titulo"
+          type="text"
+          maxlength="255"
+          :class="inputClass(errors.titulo)"
+          placeholder="Ex.: Compressor desarmando por alta temperatura"
+          @blur="validate('titulo')"
         />
-        <p v-if="errors.titulo" class="text-sm text-red-600 mt-1 flex items-center">
-          <AlertCircle :size="14" class="mr-1" />
-          {{ errors.titulo }}
-        </p>
-        <p v-else class="text-xs text-gray-500 mt-1">
-          Mínimo 5 caracteres
-        </p>
+        <p v-if="errors.titulo" class="text-sm text-red-600 mt-1">{{ errors.titulo }}</p>
       </div>
 
-      <!-- Ativo e Ambiente -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Ativo -->
           <div>
             <label for="ativo" class="block text-sm font-semibold text-gray-700 mb-2">
-              Ativo/Equipamento <span class="text-red-500">*</span>
+              Ativo / equipamento <span class="text-red-500">*</span>
             </label>
-            
-            <!-- Loading State -->
-            <div v-if="loadingAtivos" class="w-full px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 flex items-center gap-2">
-              <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
-              <span class="text-sm text-gray-500">Carregando ativos...</span>
+            <div v-if="loadingAtivos" class="px-4 py-3 border border-gray-300 rounded-lg bg-gray-50 text-sm text-gray-500">
+              Carregando ativos…
             </div>
-            
-            <!-- Select com Ativos -->
-            <div v-else-if="ativos.length > 0" class="relative">
-              <select 
-                v-model="formData.ativo" 
-                id="ativo" 
-                required
-                class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition appearance-none bg-white"
+            <template v-else>
+              <select
+                id="ativo"
+                v-model="ativoSelecionado"
+                @change="onAtivoChange"
+                :class="inputClass(errors.ativo) + ' bg-white'"
               >
                 <option value="">Selecione um ativo</option>
-                <option 
-                  v-for="asset in ativos" 
-                  :key="asset.id" 
-                  :value="asset.codigo"
-                >
-                  {{ asset.codigo }} - {{ asset.nome }} ({{ asset.ambiente }})
+                <option v-for="asset in ativos" :key="asset.id" :value="String(asset.id)">
+                  {{ asset.codigo }} · {{ asset.nome }}{{ asset.status !== 'Ativo' ? ` (${asset.status})` : '' }}
                 </option>
+                <option value="outro">Outro (não cadastrado)…</option>
               </select>
-              <Package :size="18" class="absolute right-3 top-3.5 text-gray-400 pointer-events-none" />
-            </div>
-            
-            <!-- Fallback: Input Manual -->
-            <div v-else>
-              <input 
-                v-model="formData.ativo" 
-                type="text" 
-                id="ativo" 
-                required
-                class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-                placeholder="Digite o código ou nome do equipamento" 
+              <input
+                v-if="ativoSelecionado === 'outro'"
+                v-model="form.ativo"
+                type="text"
+                maxlength="200"
+                :class="inputClass(errors.ativo) + ' mt-2'"
+                placeholder="Descreva o equipamento"
               />
-              <p class="text-xs text-amber-600 mt-1 flex items-center gap-1">
-                <AlertCircle :size="14" />
-                Nenhum ativo cadastrado. Digite manualmente ou 
-                <router-link to="/assets/create" class="underline hover:text-amber-700">
-                  cadastre aqui
-                </router-link>
+              <p v-if="errors.ativo" class="text-sm text-red-600 mt-1">{{ errors.ativo }}</p>
+              <p v-else-if="!ativos.length" class="text-xs text-amber-700 mt-1">
+                Nenhum ativo cadastrado ainda.
+                <router-link v-if="authStore.isAdmin" to="/assets/create" class="underline">Cadastrar ativo</router-link>
               </p>
-            </div>
-            
-            <!-- Debug Info (remover em produção) -->
-            <p class="text-xs text-gray-400 mt-1">
-              {{ ativos.length }} ativo(s) disponível(is)
-            </p>
+            </template>
           </div>
 
-          <!-- Ambiente -->
           <div>
-            <label for="ambiente" class="block text-sm font-semibold text-gray-700 mb-2">
-              Ambiente/Localização <span class="text-red-500">*</span>
-            </label>
-            <input 
-              v-model="formData.ambiente" 
-              type="text" 
-              id="ambiente" 
-              required
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-              placeholder="Ex: Sala 102 - Administrativo" 
+            <label for="ambiente" class="block text-sm font-semibold text-gray-700 mb-2">Ambiente / localização</label>
+            <input
+              v-model="form.ambiente"
+              id="ambiente"
+              type="text"
+              maxlength="200"
+              :class="inputClass()"
+              placeholder="Preenchido pelo ativo; ajuste se precisar"
             />
-            <p class="text-xs text-gray-500 mt-1">
-              Onde o equipamento está localizado
-            </p>
+            <p class="text-xs text-gray-500 mt-1">Onde o problema está acontecendo</p>
           </div>
         </div>
       </div>
 
-      <!-- Descrição -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <label for="descricao" class="block text-sm font-semibold text-gray-700 mb-2">
           Descrição <span class="text-red-500">*</span>
         </label>
-        <textarea 
-          v-model="formData.descricao" 
-          id="descricao" 
-          required 
-          minlength="15" 
-          rows="5" 
-          :class="[
-            'w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition resize-none',
-            errors.descricao ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
-          ]" 
-          placeholder="Descreva detalhadamente o problema (mínimo 15 caracteres)"
-          @blur="validateField('descricao')"
+        <textarea
+          v-model="form.descricao"
+          id="descricao"
+          rows="5"
+          :class="inputClass(errors.descricao) + ' resize-y'"
+          placeholder="O que está acontecendo, desde quando, o que já foi tentado…"
+          @blur="validate('descricao')"
         ></textarea>
-        <div class="flex items-center justify-between mt-2">
-          <p v-if="errors.descricao" class="text-sm text-red-600 flex items-center">
-            <AlertCircle :size="14" class="mr-1" />
-            {{ errors.descricao }}
-          </p>
-          <p v-else class="text-xs text-gray-500">
-            {{ formData.descricao.length }} / 15 caracteres mínimos
-          </p>
-        </div>
+        <p v-if="errors.descricao" class="text-sm text-red-600 mt-1">{{ errors.descricao }}</p>
+        <p v-else class="text-xs text-gray-500 mt-1">{{ form.descricao.trim().length }} caracteres (mínimo 15)</p>
       </div>
 
-      <!-- Data Sugerida e Urgência -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <!-- Data Sugerida -->
           <div>
-            <label for="data-sugerida" class="block text-sm font-semibold text-gray-700 mb-2">
-              Data Sugerida de Resolução
-            </label>
-            <input 
-              v-model="formData.data_sugerida" 
-              type="datetime-local" 
-              id="data-sugerida"
-              class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition" 
-            />
-            <p class="text-xs text-gray-500 mt-1">
-              Quando você gostaria que fosse resolvido
-            </p>
+            <label for="data-sugerida" class="block text-sm font-semibold text-gray-700 mb-2">Prazo sugerido</label>
+            <input v-model="form.data_sugerida" id="data-sugerida" type="datetime-local" :class="inputClass()" />
+            <p class="text-xs text-gray-500 mt-1">Opcional. Depois desse prazo o chamado aparece como atrasado.</p>
           </div>
-
-          <!-- Urgência -->
           <div>
-            <label class="block text-sm font-semibold text-gray-700 mb-2">
-              Nível de Urgência <span class="text-red-500">*</span>
-            </label>
+            <span class="block text-sm font-semibold text-gray-700 mb-2">Urgência <span class="text-red-500">*</span></span>
             <div class="grid grid-cols-4 gap-2">
-              <button 
-                v-for="nivel in ['Baixa', 'Média', 'Alta', 'Crítico']" 
-                :key="nivel" 
+              <button
+                v-for="nivel in niveis"
+                :key="nivel"
                 type="button"
-                @click="formData.urgencia = nivel" 
+                @click="form.urgencia = nivel"
                 :class="[
-                  'px-3 py-3 text-sm font-medium rounded-lg border-2 transition-all',
-                  formData.urgencia === nivel
-                    ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                    : 'border-gray-300 hover:border-gray-400 text-gray-700'
+                  'px-2 py-3 text-sm font-medium rounded-lg border-2 transition-all',
+                  form.urgencia === nivel ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-gray-300 hover:border-gray-400 text-gray-700',
                 ]"
               >
                 {{ nivel }}
               </button>
             </div>
-            <p v-if="errors.urgencia" class="text-sm text-red-600 mt-2 flex items-center">
-              <AlertCircle :size="14" class="mr-1" />
-              {{ errors.urgencia }}
-            </p>
           </div>
         </div>
       </div>
 
-      <!-- Responsáveis -->
       <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-        <label class="block text-sm font-semibold text-gray-700 mb-3">
-          Responsáveis (opcional)
-        </label>
+        <span class="block text-sm font-semibold text-gray-700 mb-3">Responsáveis (opcional)</span>
         <div class="relative" ref="dropdownContainer">
-          <input 
-            v-model="searchResponsavel" 
-            type="text" 
-            placeholder="Buscar usuários..."
-            class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
-            @input="handleResponsavelSearch" 
-            @focus="showResponsavelDropdown = true" 
+          <input
+            v-model="searchResponsavel"
+            type="text"
+            placeholder="Buscar pessoas pelo nome ou e-mail…"
+            class="w-full px-4 py-3 pr-10 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            @focus="showDropdown = true"
+            @input="showDropdown = true"
           />
           <Search :size="18" class="absolute right-3 top-3.5 text-gray-400 pointer-events-none" />
-
-          <!-- Dropdown de Responsáveis -->
-          <div 
-            v-if="showResponsavelDropdown && filteredResponsaveis.length > 0"
+          <div
+            v-if="showDropdown && filteredUsers.length"
             class="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-auto"
           >
-            <button 
-              v-for="user in filteredResponsaveis" 
-              :key="user.id" 
-              type="button" 
-              @click="toggleResponsavel(user)"
+            <button
+              v-for="user in filteredUsers"
+              :key="user.id"
+              type="button"
+              @click="toggleResponsavel(user.id)"
               :class="[
-                'w-full text-left px-4 py-3 transition border-b border-gray-100 last:border-b-0 flex items-center justify-between',
-                isResponsavelSelected(user.id) ? 'bg-blue-50' : 'hover:bg-gray-50'
+                'w-full text-left px-4 py-3 border-b border-gray-100 last:border-b-0 flex items-center justify-between',
+                form.responsaveis.includes(user.id) ? 'bg-blue-50' : 'hover:bg-gray-50',
               ]"
             >
-              <div class="flex items-center gap-3">
-                <div class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
-                  {{ getInitials(user) }}
-                </div>
-                <div>
-                  <div class="font-medium text-gray-900">{{ getFullName(user) }}</div>
-                  <div class="text-xs text-gray-500">{{ user.email }}</div>
-                </div>
-              </div>
-              <CheckCircle v-if="isResponsavelSelected(user.id)" :size="20" class="text-blue-600" />
+              <span class="flex items-center gap-3">
+                <span class="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                  {{ initials(user) }}
+                </span>
+                <span>
+                  <span class="block font-medium text-gray-900">{{ fullName(user) }}</span>
+                  <span class="block text-xs text-gray-500">{{ user.email }}</span>
+                </span>
+              </span>
+              <CheckCircle v-if="form.responsaveis.includes(user.id)" :size="20" class="text-blue-600" />
             </button>
           </div>
         </div>
 
-        <!-- Responsáveis Selecionados -->
-        <div v-if="selectedResponsaveis.length > 0" class="mt-4 flex flex-wrap gap-2">
-          <div 
-            v-for="user in selectedResponsaveis" 
+        <div v-if="selectedUsers.length" class="mt-4 flex flex-wrap gap-2">
+          <span
+            v-for="user in selectedUsers"
             :key="user.id"
-            class="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg"
+            class="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm font-medium text-blue-900"
           >
-            <div class="w-6 h-6 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white font-semibold text-xs">
-              {{ getInitials(user) }}
-            </div>
-            <span class="text-sm font-medium text-blue-900">{{ getFullName(user) }}</span>
-            <button 
-              type="button" 
-              @click="removeResponsavel(user.id)"
-              class="p-0.5 hover:bg-blue-100 rounded transition"
-            >
+            {{ fullName(user) }}
+            <button type="button" @click="toggleResponsavel(user.id)" class="p-0.5 hover:bg-blue-100 rounded" :title="`Remover ${fullName(user)}`">
               <X :size="14" class="text-blue-600" />
             </button>
-          </div>
+          </span>
         </div>
-
-        <p class="text-xs text-gray-500 mt-2">
-          Você pode adicionar múltiplos responsáveis
-        </p>
       </div>
 
-      <!-- Botões -->
-      <div class="flex justify-end gap-4 pt-6">
-        <router-link 
-          to="/tasks"
-          class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50 transition"
-        >
+      <div v-if="submitError" class="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-800">{{ submitError }}</div>
+
+      <div class="flex justify-end gap-4">
+        <button type="button" @click="cancel" class="px-6 py-3 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-50">
           Cancelar
-        </router-link>
-        <button 
-          type="submit" 
-          :disabled="loading || !isFormValid"
-          class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm flex items-center gap-2"
+        </button>
+        <button
+          type="submit"
+          :disabled="saving"
+          class="px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          <span v-if="!loading">Criar Chamado</span>
-          <span v-else class="flex items-center gap-2">
-            <div class="loader"></div>
-            Criando...
-          </span>
+          {{ saving ? 'Salvando…' : isEdit ? 'Salvar alterações' : 'Abrir chamado' }}
         </button>
       </div>
     </form>
@@ -294,247 +202,178 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
-import { useTasksStore } from '@/stores/tasks'
-import { useUiStore } from '@/stores/ui'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { ArrowLeft, CheckCircle, Search, X } from 'lucide-vue-next'
+import { assetsApi, tasksApi, usersApi, extractError } from '@/api'
 import { useAuthStore } from '@/stores/auth'
-import { usersApi, assetsApi } from '@/api'
-import {
-  ArrowLeft,
-  AlertCircle,
-  Search,
-  CheckCircle,
-  X,
-  Package
-} from 'lucide-vue-next'
+import { useUiStore } from '@/stores/ui'
 import type { Asset, User } from '@/types'
+import { URGENCIA_OPTIONS, fullName, initials, toDateTimeLocal } from '@/utils/display'
 
+const route = useRoute()
 const router = useRouter()
-const tasksStore = useTasksStore()
-const uiStore = useUiStore()
 const authStore = useAuthStore()
+const uiStore = useUiStore()
 
-const formData = ref({
+const taskId = route.params.id ? String(route.params.id) : ''
+const isEdit = !!taskId
+const niveis = [...URGENCIA_OPTIONS].reverse()
+
+const form = ref({
   titulo: '',
   ativo: '',
   ambiente: '',
   descricao: '',
-  urgencia: 'Média',
+  urgencia: 'Média' as string,
   data_sugerida: '',
-  responsaveis: [] as number[]
+  responsaveis: [] as number[],
 })
-
+const ativoSelecionado = ref('') // id do ativo, 'outro' ou ''
 const errors = ref<Record<string, string>>({})
-const loading = ref(false)
-const loadingAtivos = ref(false)
+const submitError = ref('')
+const saving = ref(false)
+const loadingTask = ref(isEdit)
+const loadingAtivos = ref(true)
 
-// Responsáveis
 const usuarios = ref<User[]>([])
 const ativos = ref<Asset[]>([])
 const searchResponsavel = ref('')
-const selectedResponsaveis = ref<User[]>([])
-const showResponsavelDropdown = ref(false)
+const showDropdown = ref(false)
 const dropdownContainer = ref<HTMLElement | null>(null)
 
-const filteredResponsaveis = computed(() => {
-  if (!searchResponsavel.value) return usuarios.value.slice(0, 10)
+const inputClass = (erro?: string) =>
+  `w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 transition ${
+    erro ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+  }`
 
-  const query = searchResponsavel.value.toLowerCase()
-  return usuarios.value.filter(user => {
-    const fullName = getFullName(user).toLowerCase()
-    return fullName.includes(query) || user.email.toLowerCase().includes(query)
-  }).slice(0, 10)
+const filteredUsers = computed(() => {
+  const q = searchResponsavel.value.trim().toLowerCase()
+  const lista = q
+    ? usuarios.value.filter((u) => fullName(u).toLowerCase().includes(q) || (u.email || '').toLowerCase().includes(q))
+    : usuarios.value
+  return lista.slice(0, 20)
 })
 
-const isFormValid = computed(() => {
-  return formData.value.titulo.length >= 5 &&
-    formData.value.ativo &&
-    formData.value.ambiente &&
-    formData.value.descricao.length >= 15 &&
-    formData.value.urgencia
-})
+const selectedUsers = computed(() => usuarios.value.filter((u) => form.value.responsaveis.includes(u.id)))
 
-const validateField = (field: string) => {
-  errors.value[field] = ''
+const validate = (campo: 'titulo' | 'descricao' | 'ativo') => {
+  delete errors.value[campo]
+  const f = form.value
+  if (campo === 'titulo' && f.titulo.trim().length < 5) errors.value.titulo = 'O título precisa ter pelo menos 5 caracteres.'
+  if (campo === 'descricao' && f.descricao.trim().length < 15) errors.value.descricao = 'Descreva com pelo menos 15 caracteres.'
+  if (campo === 'ativo' && !ativoSelecionado.value) errors.value.ativo = 'Escolha o ativo (ou "Outro").'
+  if (campo === 'ativo' && ativoSelecionado.value === 'outro' && !f.ativo.trim()) errors.value.ativo = 'Descreva o equipamento.'
+}
 
-  if (field === 'titulo' && formData.value.titulo.length < 5) {
-    errors.value.titulo = 'O título deve ter pelo menos 5 caracteres'
-  }
-
-  if (field === 'descricao' && formData.value.descricao.length < 15) {
-    errors.value.descricao = 'A descrição deve ter pelo menos 15 caracteres'
-  }
-
-  if (field === 'urgencia' && !formData.value.urgencia) {
-    errors.value.urgencia = 'Selecione um nível de urgência'
+const onAtivoChange = () => {
+  delete errors.value.ativo
+  const ativo = ativos.value.find((a) => String(a.id) === ativoSelecionado.value)
+  if (ativo) {
+    form.value.ambiente = ativo.ambiente
+    form.value.ativo = `${ativo.codigo} - ${ativo.nome}`
+  } else if (ativoSelecionado.value === 'outro') {
+    form.value.ativo = ''
   }
 }
 
-const handleResponsavelSearch = () => {
-  showResponsavelDropdown.value = true
-}
-
-const toggleResponsavel = (user: User) => {
-  const index = selectedResponsaveis.value.findIndex(u => u.id === user.id)
-  if (index > -1) {
-    selectedResponsaveis.value.splice(index, 1)
-  } else {
-    selectedResponsaveis.value.push(user)
-  }
+const toggleResponsavel = (id: number) => {
+  const lista = form.value.responsaveis
+  form.value.responsaveis = lista.includes(id) ? lista.filter((x) => x !== id) : [...lista, id]
   searchResponsavel.value = ''
-  showResponsavelDropdown.value = false
 }
 
-const removeResponsavel = (userId: number) => {
-  selectedResponsaveis.value = selectedResponsaveis.value.filter(u => u.id !== userId)
-}
-
-const isResponsavelSelected = (userId: number) => {
-  return selectedResponsaveis.value.some(u => u.id === userId)
-}
-
-const getFullName = (user: User) => {
-  const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
-  return fullName || user.username
-}
-
-const getInitials = (user: User) => {
-  if (user.first_name && user.last_name) {
-    return `${user.first_name[0]}${user.last_name[0]}`.toUpperCase()
-  }
-  return user.username.substring(0, 2).toUpperCase()
-}
+const cancel = () => router.push(isEdit ? `/tasks/${taskId}` : '/tasks')
 
 const handleSubmit = async () => {
-  validateField('titulo')
-  validateField('descricao')
-  validateField('urgencia')
-
-  if (!isFormValid.value) {
-    uiStore.showToast('error', 'Por favor, preencha todos os campos obrigatórios')
+  ;(['titulo', 'descricao', 'ativo'] as const).forEach(validate)
+  if (Object.keys(errors.value).length) {
+    uiStore.showToast('error', 'Confira os campos destacados.')
     return
   }
 
-  loading.value = true
+  saving.value = true
+  submitError.value = ''
+  const f = form.value
+  const ativoId = ativoSelecionado.value && ativoSelecionado.value !== 'outro' ? Number(ativoSelecionado.value) : null
+  const payload = {
+    titulo: f.titulo.trim(),
+    descricao: f.descricao.trim(),
+    ativo: f.ativo.trim(),
+    ativo_ref: ativoId,
+    ambiente: f.ambiente.trim(),
+    urgencia: f.urgencia,
+    data_sugerida: f.data_sugerida ? new Date(f.data_sugerida).toISOString() : null,
+    responsaveis: f.responsaveis,
+  }
 
   try {
-    const taskData = {
-      titulo: formData.value.titulo,
-      ativo: formData.value.ativo,
-      ambiente: formData.value.ambiente,
-      descricao: formData.value.descricao,
-      urgencia: formData.value.urgencia,
-      data_sugerida: formData.value.data_sugerida || undefined,
-      responsaveis: selectedResponsaveis.value.map(u => u.id)
-    }
-
-    const createdTask = await tasksStore.createTask(taskData)
-    uiStore.showToast('success', 'Chamado criado com sucesso!')
-    router.push(`/tasks/${createdTask.id}`)
-  } catch (error: any) {
-    console.error('Erro ao criar chamado:', error)
-    uiStore.showToast('error', error.response?.data?.message || 'Erro ao criar chamado')
+    const salvo = isEdit ? await tasksApi.update(taskId, payload) : await tasksApi.create(payload)
+    uiStore.showToast('success', isEdit ? 'Chamado atualizado.' : `Chamado #${salvo.id} aberto.`)
+    router.push(`/tasks/${salvo.id}`)
+  } catch (err) {
+    submitError.value = extractError(err, 'Não foi possível salvar o chamado.')
   } finally {
-    loading.value = false
+    saving.value = false
   }
 }
 
-const loadUsuarios = async () => {
+const loadTask = async () => {
   try {
-    const data = await usersApi.getAll()
-    usuarios.value = Array.isArray(data) ? data.filter(user => user && user.id) : []
-    console.log('Usuários carregados:', usuarios.value.length)
-  } catch (error) {
-    console.error('❌ Erro ao carregar usuários:', error)
-    usuarios.value = []
+    const t = await tasksApi.getById(taskId)
+    form.value = {
+      titulo: t.titulo,
+      ativo: t.ativo,
+      ambiente: t.ambiente,
+      descricao: t.descricao,
+      urgencia: t.urgencia,
+      data_sugerida: toDateTimeLocal(t.data_sugerida),
+      responsaveis: t.responsaveis || [],
+    }
+    ativoSelecionado.value = t.ativo_ref ? String(t.ativo_ref) : t.ativo ? 'outro' : ''
+  } catch (err) {
+    uiStore.showToast('error', extractError(err, 'Chamado não encontrado.'))
+    router.push('/tasks')
+  } finally {
+    loadingTask.value = false
   }
 }
 
 const loadAtivos = async () => {
-  loadingAtivos.value = true
   try {
-    console.log(' Iniciando carregamento de ativos...')
-    
-    const response = await assetsApi.getAll()
-    console.log('Resposta recebida:', response)
-    console.log('Tipo:', Array.isArray(response) ? 'Array' : typeof response)
-    
-    // Normalizar resposta
-    let ativosList: Asset[] = []
-    
-    if (Array.isArray(response)) {
-      ativosList = response
-    } else if (response && typeof response === 'object') {
-      if (response.results && Array.isArray(response.results)) {
-        ativosList = response.results
-      } else if (response.data && Array.isArray(response.data)) {
-        ativosList = response.data
-      }
+    ativos.value = await assetsApi.getAll({ ordering: 'codigo' })
+    // Vindo da tela do ativo ("Abrir chamado"): já deixa o ativo escolhido.
+    const preset = route.query.ativo as string | undefined
+    if (!isEdit && preset && ativos.value.some((a) => String(a.id) === preset)) {
+      ativoSelecionado.value = preset
+      onAtivoChange()
     }
-    
-    // Filtrar objetos válidos
-    ativos.value = ativosList.filter(asset => 
-      asset && 
-      typeof asset === 'object' && 
-      asset.id && 
-      asset.codigo && 
-      asset.nome
-    )
-    
-    console.log('Ativos processados:', ativos.value.length)
-    if (ativos.value.length > 0) {
-      console.log(' Primeiro ativo:', ativos.value[0])
-    } else {
-      console.warn('Nenhum ativo válido encontrado')
-      uiStore.showToast('warning', 'Nenhum ativo cadastrado. Você pode digitar manualmente.')
-    }
-    
-  } catch (error: any) {
-    console.error('❌ Erro ao carregar ativos:', error)
-    console.error('Detalhes:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status
-    })
-    ativos.value = []
-    uiStore.showToast('warning', 'Erro ao carregar ativos. Digite manualmente.')
+  } catch (err) {
+    ativoSelecionado.value = 'outro'
+    uiStore.showToast('warning', 'Não foi possível carregar os ativos; descreva o equipamento.')
   } finally {
     loadingAtivos.value = false
   }
 }
 
-const handleClickOutside = (event: MouseEvent) => {
-  const target = event.target as HTMLElement
-  if (dropdownContainer.value && !dropdownContainer.value.contains(target)) {
-    showResponsavelDropdown.value = false
+const loadUsuarios = async () => {
+  try {
+    usuarios.value = (await usersApi.getAll({ ordering: 'first_name' })).filter((u) => u.is_active !== false)
+  } catch {
+    usuarios.value = []
   }
 }
 
-onMounted(() => {
-  console.log('🚀 CreateTaskView montado')
-  loadUsuarios()
-  loadAtivos()
+const handleClickOutside = (event: MouseEvent) => {
+  if (dropdownContainer.value && !dropdownContainer.value.contains(event.target as Node)) {
+    showDropdown.value = false
+  }
+}
+
+onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
+  await Promise.all([loadAtivos(), loadUsuarios(), isEdit ? loadTask() : Promise.resolve()])
 })
 
-onUnmounted(() => {
-  document.removeEventListener('click', handleClickOutside)
-})
+onUnmounted(() => document.removeEventListener('click', handleClickOutside))
 </script>
-
-<style scoped>
-.loader {
-  border: 3px solid rgba(255, 255, 255, 0.3);
-  border-top: 3px solid #ffffff;
-  border-radius: 50%;
-  width: 20px;
-  height: 20px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-</style>

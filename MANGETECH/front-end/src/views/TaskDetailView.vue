@@ -1,60 +1,56 @@
 <template>
   <div class="space-y-6">
     <div v-if="loading" class="flex flex-col items-center justify-center py-16">
-      <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-blue-600"></div>
-      <p class="text-gray-600 mt-4 font-medium">Carregando chamado...</p>
+      <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <p class="text-gray-600 mt-4">Carregando chamado…</p>
     </div>
 
-    <div v-else-if="error" class="bg-white rounded-xl border border-red-200 shadow-sm p-6">
-      <div class="text-center py-8">
-        <div class="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-          <AlertCircle :size="32" class="text-red-600" />
-        </div>
-        <h3 class="text-lg font-semibold text-gray-900 mb-2">Erro ao carregar chamado</h3>
-        <p class="text-gray-600 mb-4">{{ error }}</p>
-        <button
-          @click="$router.push('/tasks')"
-          class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          Voltar para Lista
-        </button>
-      </div>
+    <div v-else-if="error" class="bg-white rounded-xl border border-red-200 shadow-sm p-8 text-center">
+      <AlertCircle :size="32" class="mx-auto text-red-500 mb-3" />
+      <h3 class="text-lg font-semibold text-gray-900 mb-2">Não foi possível abrir o chamado</h3>
+      <p class="text-gray-600 mb-4">{{ error }}</p>
+      <router-link to="/tasks" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Voltar para a lista</router-link>
     </div>
 
-    <div v-else-if="task">
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex items-center gap-3">
-          <button
-            @click="$router.push('/tasks')"
-            class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition"
-          >
+    <template v-else-if="task">
+      <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div class="flex items-center gap-3 min-w-0">
+          <button @click="goBack" class="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg" title="Voltar">
             <ArrowLeft :size="20" />
           </button>
-          <div>
-            <div class="flex items-center gap-2 mb-1">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2 mb-1">
               <h1 class="text-2xl font-bold text-gray-900">Chamado #{{ task.id }}</h1>
               <span :class="['px-3 py-1 text-sm font-semibold rounded-full', statusClass(task.status)]">
-                {{ task.status }}
+                {{ statusLabel(task.status) }}
               </span>
+              <span v-if="task.atrasado" class="px-3 py-1 text-sm font-semibold rounded-full bg-red-600 text-white">Atrasado</span>
             </div>
-            <p class="text-sm text-gray-500">Criado em {{ formatDate(task.data_criacao) }}</p>
+            <p class="text-sm text-gray-500">
+              Aberto em {{ formatDateTime(task.data_criacao) }} por {{ task.solicitante_nome || '—' }}
+              · atualizado {{ timeAgo(task.data_atualizacao) }}
+            </p>
           </div>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button
-            @click="showCommentModal = true"
-            class="flex items-center gap-2 px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 transition"
-          >
-            <MessageSquare :size="18" />
-            <span>Adicionar Comentário</span>
+        <div class="flex flex-wrap items-center gap-2">
+          <button @click="showCommentModal = true" class="flex items-center gap-2 px-4 py-2 text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100">
+            <MessageSquare :size="18" /> Comentar
           </button>
+          <button @click="showStatusModal = true" class="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700">
+            <RefreshCw :size="18" /> Mudar status
+          </button>
+          <router-link :to="`/tasks/${task.id}/edit`" class="flex items-center gap-2 px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <Pencil :size="18" /> Editar
+          </router-link>
           <button
-            @click="showStatusModal = true"
-            class="flex items-center gap-2 px-4 py-2 text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition"
+            v-if="canDelete"
+            @click="deleteTask"
+            :disabled="deleting || task.status === 'EM ANDAMENTO'"
+            :title="task.status === 'EM ANDAMENTO' ? 'Chamado em andamento não pode ser excluído' : 'Excluir chamado'"
+            class="flex items-center gap-2 px-4 py-2 text-red-600 border border-red-200 rounded-lg hover:bg-red-50 disabled:opacity-40 disabled:cursor-not-allowed"
           >
-            <RefreshCw :size="18" />
-            <span>Mudar Status</span>
+            <Trash2 :size="18" />
           </button>
         </div>
       </div>
@@ -62,344 +58,320 @@
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div class="lg:col-span-2 space-y-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h2 class="text-xl font-semibold text-gray-900 mb-4">{{ task.titulo }}</h2>
-            
-            <div class="space-y-4">
-              <div>
-                <label class="text-sm font-medium text-gray-500">Descrição</label>
-                <p class="mt-1 text-gray-900 whitespace-pre-wrap">{{ task.descricao }}</p>
-              </div>
-
-              <div class="grid grid-cols-2 gap-4 pt-4 border-t border-gray-100">
-                <div>
-                  <label class="text-sm font-medium text-gray-500">Prioridade</label>
-                  <div class="mt-1">
-                    <span :class="['inline-flex items-center px-3 py-1 text-sm font-bold rounded-full', priorityClass(task.urgencia)]">
-                      {{ task.urgencia }}
-                    </span>
-                  </div>
-                </div>
-
-                </div>
+            <div class="flex items-start justify-between gap-3 mb-4">
+              <h2 class="text-xl font-semibold text-gray-900">{{ task.titulo }}</h2>
+              <span :class="['inline-flex px-3 py-1 text-sm font-bold rounded-full whitespace-nowrap', priorityClass(task.urgencia)]">
+                {{ task.urgencia }}
+              </span>
             </div>
+            <p class="text-gray-800 whitespace-pre-wrap">{{ task.descricao }}</p>
           </div>
 
+          <!-- Anexos -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h3 class="text-lg font-semibold text-gray-900">Anexos</h3>
+              <label class="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 cursor-pointer">
+                <Paperclip :size="16" />
+                {{ uploading ? 'Enviando…' : 'Anexar arquivo' }}
+                <input type="file" class="hidden" :disabled="uploading" @change="uploadAttachment" />
+              </label>
+            </div>
+            <ul v-if="task.anexos_detalhes?.length" class="divide-y divide-gray-100">
+              <li v-for="anexo in task.anexos_detalhes" :key="anexo.id" class="flex items-center justify-between py-2 gap-3">
+                <a :href="anexo.url || '#'" target="_blank" rel="noopener" class="flex items-center gap-2 text-sm text-blue-700 hover:underline min-w-0">
+                  <FileText :size="16" class="flex-shrink-0" />
+                  <span class="truncate">{{ anexo.nome_original }}</span>
+                </a>
+                <div class="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
+                  {{ formatDateTime(anexo.data_upload) }}
+                  <button @click="removeAttachment(anexo.id)" class="p-1 text-gray-400 hover:text-red-600" title="Remover anexo">
+                    <X :size="16" />
+                  </button>
+                </div>
+              </li>
+            </ul>
+            <p v-else class="text-sm text-gray-500">Nenhum arquivo anexado. Notas fiscais, laudos e manuais podem ficar aqui (até 20 MB).</p>
+          </div>
+
+          <!-- Linha do tempo -->
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <div class="flex items-center justify-between mb-6">
-              <h3 class="text-lg font-semibold text-gray-900">Histórico e Comentários</h3>
-              <span class="text-sm text-gray-500">{{ comentarios.length }} {{ comentarios.length === 1 ? 'item' : 'itens' }}</span>
+              <h3 class="text-lg font-semibold text-gray-900">Histórico e comentários</h3>
+              <span class="text-sm text-gray-500">{{ timeline.length }} {{ timeline.length === 1 ? 'item' : 'itens' }}</span>
             </div>
 
-            <div v-if="comentarios.length > 0" class="space-y-6">
-              <div
-                v-for="(comentario, index) in comentarios"
-                :key="comentario.id"
-                class="relative"
-              >
-                <div
-                  v-if="index < comentarios.length - 1"
-                  class="absolute left-5 top-12 bottom-0 w-0.5 bg-gray-200"
-                ></div>
-
-                <div class="flex gap-4">
-                  <div class="flex-shrink-0">
-                    <div class="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <User :size="20" class="text-blue-600" />
-                    </div>
+            <div v-if="timeline.length" class="space-y-5">
+              <div v-for="item in timeline" :key="item.key" class="flex gap-4">
+                <div class="flex-shrink-0">
+                  <div
+                    :class="[
+                      'w-10 h-10 rounded-full flex items-center justify-center',
+                      item.tipo === 'status' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600',
+                    ]"
+                  >
+                    <RefreshCw v-if="item.tipo === 'status'" :size="18" />
+                    <MessageSquare v-else :size="18" />
                   </div>
-
-                  <div class="flex-1 bg-gray-50 rounded-lg p-4">
-                    <div class="flex items-start justify-between mb-2">
-                      <div>
-                        <p class="font-semibold text-gray-900">{{ comentario.autor }}</p>
-                        <p class="text-xs text-gray-500">{{ formatDate(comentario.data_criacao) }}</p>
-                      </div>
-                      <span
-                        v-if="comentario.tipo === 'status_change'"
-                        class="text-xs px-2 py-1 bg-purple-100 text-purple-700 rounded-full font-medium"
-                      >
-                        Mudança de Status
-                      </span>
+                </div>
+                <div class="flex-1 bg-gray-50 rounded-lg p-4 min-w-0">
+                  <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div>
+                      <p class="font-semibold text-gray-900">{{ item.autor }}</p>
+                      <p class="text-xs text-gray-500">{{ formatDateTime(item.data) }}</p>
                     </div>
-                    <p class="text-gray-700 whitespace-pre-wrap">{{ comentario.texto }}</p>
-
-                    <div v-if="comentario.fotos && comentario.fotos.length > 0" class="mt-3 grid grid-cols-3 gap-2">
-                      <img
-                        v-for="(foto, fotoIndex) in comentario.fotos"
-                        :key="foto.id || fotoIndex"
-                        :src="foto.url" 
-                        :alt="`Foto ${fotoIndex + 1}`"
-                        class="w-full h-24 object-cover rounded-lg cursor-pointer hover:opacity-80 transition border border-gray-200"
-                        @click="openImagePreview(foto.url)"
-                      />
-                    </div>
+                    <span v-if="item.tipo === 'status'" :class="['text-xs px-2 py-1 rounded-full font-medium', statusClass(item.status || '')]">
+                      {{ statusLabel(item.status || '') }}
+                    </span>
+                  </div>
+                  <p class="text-gray-700 whitespace-pre-wrap break-words">{{ item.texto }}</p>
+                  <div v-if="item.fotos.length" class="mt-3 grid grid-cols-3 sm:grid-cols-4 gap-2">
+                    <a v-for="foto in item.fotos" :key="foto.id" :href="foto.url || '#'" target="_blank" rel="noopener">
+                      <img :src="foto.url || ''" alt="Foto anexada" class="w-full h-24 object-cover rounded-lg border border-gray-200 hover:opacity-80" />
+                    </a>
                   </div>
                 </div>
               </div>
             </div>
-
-            <div v-else class="text-center py-12">
-              <MessageSquare :size="40" class="mx-auto text-gray-300 mb-3" />
-              <p class="text-gray-500 mb-4">Nenhum comentário ainda</p>
-              <button
-                @click="showCommentModal = true"
-                class="text-blue-600 hover:text-blue-700 font-medium text-sm"
-              >
-                Adicionar o primeiro comentário
-              </button>
-            </div>
+            <div v-else class="text-center py-10 text-gray-500">Nenhum registro ainda.</div>
           </div>
         </div>
 
         <div class="space-y-6">
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-            <h3 class="text-lg font-semibold text-gray-900 mb-4">Ativo Relacionado</h3>
-            <div class="space-y-3">
-              <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <Package :size="20" class="text-gray-600" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-500">Código/Nome</p>
-                  <p class="text-sm font-semibold text-gray-900 truncate">{{ task.ativo }}</p>
-                </div>
+            <h3 class="text-lg font-semibold text-gray-900 mb-4">Ativo</h3>
+            <router-link
+              v-if="task.ativo_detalhes"
+              :to="`/assets/${task.ativo_detalhes.id}`"
+              class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-blue-50 transition"
+            >
+              <Package :size="20" class="text-gray-600" />
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-900 truncate">{{ task.ativo_detalhes.codigo }} · {{ task.ativo_detalhes.nome }}</p>
+                <p class="text-xs text-gray-500">Status do ativo: {{ task.ativo_detalhes.status }}</p>
               </div>
-
-              <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
-                <MapPin :size="20" class="text-gray-600" />
-                <div class="flex-1 min-w-0">
-                  <p class="text-sm font-medium text-gray-500">Localização</p>
-                  <p class="text-sm font-semibold text-gray-900 truncate">{{ task.ambiente }}</p>
-                </div>
+              <ChevronRight :size="16" class="text-gray-400" />
+            </router-link>
+            <div v-else class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
+              <Package :size="20" class="text-gray-600" />
+              <div class="min-w-0">
+                <p class="text-sm font-semibold text-gray-900 truncate">{{ task.ativo || '—' }}</p>
+                <p class="text-xs text-gray-500">Sem vínculo com um ativo cadastrado</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mt-3">
+              <MapPin :size="20" class="text-gray-600" />
+              <div class="min-w-0">
+                <p class="text-xs text-gray-500">Localização</p>
+                <p class="text-sm font-semibold text-gray-900 truncate">{{ task.ambiente }}</p>
               </div>
             </div>
           </div>
 
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Equipe</h3>
-            <div class="space-y-4">
-              <div>
-                <label class="text-sm font-medium text-gray-500">Solicitante</label>
-                <p class="mt-1 text-gray-900 font-medium">
-                  {{ task.solicitante_nome || 'Não informado' }}
-                </p>
-              </div>
-              <div class="pt-4 border-t border-gray-100">
-                <label class="text-sm font-medium text-gray-500">Responsáveis</label>
-                <p class="mt-1 text-gray-900 font-medium">
-                  <span v-if="task.responsaveis_nomes && task.responsaveis_nomes.length > 0">
-                    {{ task.responsaveis_nomes.join(', ') }}
+            <p class="text-sm text-gray-500">Solicitante</p>
+            <p class="mt-1 text-gray-900 font-medium">{{ task.solicitante_nome || 'Não informado' }}</p>
+            <p v-if="task.solicitante_email" class="text-xs text-gray-500">{{ task.solicitante_email }}</p>
+            <div class="pt-4 mt-4 border-t border-gray-100">
+              <p class="text-sm text-gray-500 mb-2">Responsáveis</p>
+              <ul v-if="task.responsaveis_detalhes?.length" class="space-y-2">
+                <li v-for="r in task.responsaveis_detalhes" :key="r.id" class="flex items-center gap-2">
+                  <span class="w-7 h-7 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center text-white text-xs font-semibold">
+                    {{ initials(r) }}
                   </span>
-                  <span v-else class="text-gray-400 italic">Não atribuído</span>
-                </p>
-              </div>
+                  <span class="text-sm text-gray-900">{{ fullName(r) }}</span>
+                </li>
+              </ul>
+              <router-link v-else :to="`/tasks/${task.id}/edit`" class="text-sm text-blue-600 hover:underline">
+                Não atribuído — definir responsáveis
+              </router-link>
             </div>
           </div>
 
           <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Datas</h3>
-            <div class="space-y-3">
+            <dl class="space-y-3 text-sm">
               <div>
-                <label class="text-sm font-medium text-gray-500">Criação</label>
-                <p class="mt-1 text-gray-900">{{ formatDate(task.data_criacao) }}</p>
+                <dt class="text-gray-500">Abertura</dt>
+                <dd class="text-gray-900">{{ formatDateTime(task.data_criacao) }}</dd>
               </div>
-              <div v-if="task.data_sugerida">
-                <label class="text-sm font-medium text-gray-500">Previsão</label>
-                <p class="mt-1 text-gray-900">{{ formatDate(task.data_sugerida) }}</p>
+              <div>
+                <dt class="text-gray-500">Prazo sugerido</dt>
+                <dd :class="task.atrasado ? 'text-red-600 font-semibold' : 'text-gray-900'">
+                  {{ formatDateTime(task.data_sugerida, 'Sem prazo') }}
+                </dd>
               </div>
-            </div>
+              <div>
+                <dt class="text-gray-500">Última atualização</dt>
+                <dd class="text-gray-900">{{ formatDateTime(task.data_atualizacao) }}</dd>
+              </div>
+            </dl>
           </div>
         </div>
       </div>
-    </div>
+    </template>
 
     <AddCommentModal
       v-if="task"
       :is-open="showCommentModal"
       :chamado-id="Number(task.id)"
       @close="showCommentModal = false"
-      @comment-added="handleCommentAdded"
+      @comment-added="onCommentAdded"
     />
-
     <AdvanceStatusModal
       v-if="task"
       :is-open="showStatusModal"
       :chamado-id="Number(task.id)"
       :current-status="task.status"
       @close="showStatusModal = false"
-      @status-changed="handleStatusChanged"
+      @status-changed="onStatusChanged"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { tasksApi } from '../api'
-import { useUiStore } from '../stores/ui'
-import { format } from 'date-fns'
 import {
-  ArrowLeft,
-  AlertCircle,
-  MessageSquare,
-  RefreshCw,
-  Package,
-  MapPin,
-  User
+  AlertCircle, ArrowLeft, ChevronRight, FileText, MapPin, MessageSquare, Package,
+  Paperclip, Pencil, RefreshCw, Trash2, X,
 } from 'lucide-vue-next'
-import AddCommentModal from '../components/modals/AddCommentModal.vue'
-import AdvanceStatusModal from '../components/modals/AdvanceStatusModal.vue'
+import { tasksApi, extractError } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
+import type { Foto, Task } from '@/types'
+import {
+  formatDateTime, fullName, initials, priorityClass, statusClass, statusLabel, timeAgo,
+} from '@/utils/display'
+import AddCommentModal from '@/components/modals/AddCommentModal.vue'
+import AdvanceStatusModal from '@/components/modals/AdvanceStatusModal.vue'
 
-// Definição da interface das Fotos
-interface Foto {
-  id: number
-  imagem: string
-  url: string
-  data_upload: string
-}
-
-// Interface atualizada conforme Backend Serializer
-interface TaskDetail {
-  id: number | string
-  titulo: string
-  descricao: string
-  status: string
-  urgencia: string
-  ativo: string
-  ambiente: string
-  // Campos de nomes vindos do backend
-  solicitante_nome?: string
-  responsaveis_nomes?: string[]
-  // Campos originais (IDs ou objetos)
-  solicitante?: any
-  responsavel?: any
-  data_criacao: string
-  data_sugerida?: string
-}
-
-interface Comentario {
-  id: number
-  texto: string
+interface TimelineItem {
+  key: string
+  tipo: 'status' | 'comentario'
+  status?: string
   autor: string
-  data_criacao: string
-  tipo?: string
-  // Fotos é um array de objetos
-  fotos?: Foto[]
+  texto: string
+  data: string
+  fotos: Foto[]
 }
 
 const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
 const uiStore = useUiStore()
 
-const task = ref<TaskDetail | null>(null)
-const comentarios = ref<Comentario[]>([])
+const task = ref<Task | null>(null)
 const loading = ref(true)
 const error = ref('')
-
+const deleting = ref(false)
+const uploading = ref(false)
 const showCommentModal = ref(false)
 const showStatusModal = ref(false)
 
-const priorityClass = (priority: string) => {
-  const classes = {
-    'Crítico': 'bg-red-100 text-red-800 border border-red-200',
-    'Alta': 'bg-orange-100 text-orange-800 border border-orange-200',
-    'Média': 'bg-yellow-100 text-yellow-800 border border-yellow-200',
-    'Baixa': 'bg-green-100 text-green-800 border border-green-200',
-  }
-  return classes[priority as keyof typeof classes] || 'bg-gray-100 text-gray-700'
-}
+const canDelete = computed(() => {
+  if (!task.value || !authStore.user) return false
+  return authStore.isAdmin || task.value.solicitante === authStore.user.id
+})
 
-const statusClass = (status: string) => {
-  const classes = {
-    'ABERTO': 'bg-blue-100 text-blue-800',
-    'AGUARDANDO RESP': 'bg-yellow-100 text-yellow-800',
-    'EM ANDAMENTO': 'bg-purple-100 text-purple-800',
-    'REALIZADO': 'bg-cyan-100 text-cyan-800',
-    'CONCLUÍDO': 'bg-green-100 text-green-800',
-    'CANCELADO': 'bg-red-100 text-red-800',
-  }
-  return classes[status as keyof typeof classes] || 'bg-gray-100 text-gray-700'
-}
+const timeline = computed<TimelineItem[]>(() => {
+  if (!task.value) return []
+  const itens: TimelineItem[] = [
+    ...(task.value.comentarios || []).map((c) => ({
+      key: `c${c.id}`,
+      tipo: 'comentario' as const,
+      autor: c.usuario_nome || 'Anônimo',
+      texto: c.texto,
+      data: c.data_criacao,
+      fotos: c.fotos || [],
+    })),
+    ...(task.value.historico || []).map((h) => ({
+      key: `h${h.id}`,
+      tipo: 'status' as const,
+      status: h.status,
+      autor: h.usuario_nome || 'Sistema',
+      texto: h.descricao,
+      data: h.data_criacao,
+      fotos: h.fotos || [],
+    })),
+  ]
+  return itens.sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime())
+})
 
-const formatDate = (date: string) => {
-  if (!date) return 'N/A'
-  try {
-    return format(new Date(date), 'dd/MM/yyyy HH:mm')
-  } catch {
-    return date
-  }
-}
-
-const loadTask = async () => {
-  loading.value = true
+const loadTask = async (silencioso = false) => {
+  if (!silencioso) loading.value = true
   error.value = ''
-
   try {
-    const taskId = route.params.id
-    const data = await tasksApi.getById(Number(taskId))
-    task.value = data as TaskDetail
-    
-    // Processar comentários
-    let comentariosProcessados: Comentario[] = []
-
-    if (data.comentarios && Array.isArray(data.comentarios)) {
-      const comms = data.comentarios.map((c: any) => ({
-        id: c.id,
-        texto: c.texto,
-        // Backend envia usuario_nome no serializer
-        autor: c.usuario_nome || c.autor?.username || 'Anônimo',
-        data_criacao: c.data_criacao || c.timestamp,
-        tipo: 'comentario',
-        // Backend envia lista de objetos foto {id, url, ...}
-        fotos: c.fotos || []
-      }))
-      comentariosProcessados = [...comentariosProcessados, ...comms]
-    }
-    
-    // Processar Histórico
-    if (data.historico && Array.isArray(data.historico)) {
-      const historicoFormatado = data.historico.map((h: any) => ({
-        id: h.id + 10000, // Offset ID para evitar colisão com comentários na key
-        texto: h.descricao,
-        autor: h.usuario_nome || 'Sistema',
-        data_criacao: h.data_criacao || h.timestamp,
-        tipo: 'status_change',
-        // No histórico, as fotos também vêm como objetos no serializer ChamadoStatusHistorySerializer -> fotos
-        fotos: h.fotos || [] 
-      }))
-      comentariosProcessados = [...comentariosProcessados, ...historicoFormatado]
-    }
-
-    // Ordenar timeline por data (mais recente primeiro)
-    comentarios.value = comentariosProcessados.sort((a, b) => {
-      return new Date(b.data_criacao).getTime() - new Date(a.data_criacao).getTime()
-    })
-
+    task.value = await tasksApi.getById(String(route.params.id))
   } catch (err: any) {
-    console.error('Erro ao carregar chamado:', err)
-    error.value = err.response?.data?.detail || err.response?.data?.message || 'Chamado não encontrado'
+    error.value = err?.response?.status === 404
+      ? 'Chamado não encontrado ou você não tem acesso a ele.'
+      : extractError(err)
   } finally {
     loading.value = false
   }
 }
 
-const handleCommentAdded = (comentario: any) => {
-  // Recarrega tudo para garantir sincronia com backend (e URLs de imagens corretas)
-  loadTask()
-  uiStore.showToast('success', 'Comentário adicionado com sucesso!')
+const goBack = () => {
+  if (window.history.state?.back) router.back()
+  else router.push('/tasks')
 }
 
-const handleStatusChanged = (statusChange: any) => {
-  // Recarrega para atualizar status e histórico
-  loadTask()
-  uiStore.showToast('success', 'Status alterado com sucesso!')
+const onCommentAdded = () => {
+  uiStore.showToast('success', 'Comentário adicionado.')
+  loadTask(true)
 }
 
-const openImagePreview = (imageUrl: string) => {
-  if (imageUrl) {
-    window.open(imageUrl, '_blank')
+const onStatusChanged = (payload: { chamado: Task }) => {
+  task.value = payload.chamado
+  uiStore.showToast('success', 'Status atualizado.')
+}
+
+const uploadAttachment = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const arquivo = input.files?.[0]
+  input.value = ''
+  if (!arquivo || !task.value) return
+  if (arquivo.size > 20 * 1024 * 1024) {
+    uiStore.showToast('error', 'O arquivo passa de 20 MB.')
+    return
+  }
+  uploading.value = true
+  try {
+    await tasksApi.addAttachment(task.value.id, arquivo)
+    uiStore.showToast('success', 'Arquivo anexado.')
+    await loadTask(true)
+  } catch (err) {
+    uiStore.showToast('error', extractError(err, 'Não foi possível anexar.'))
+  } finally {
+    uploading.value = false
   }
 }
 
-onMounted(() => {
-  loadTask()
-})
+const removeAttachment = async (anexoId: number) => {
+  if (!task.value || !confirm('Remover este anexo?')) return
+  try {
+    await tasksApi.removeAttachment(task.value.id, anexoId)
+    task.value.anexos_detalhes = (task.value.anexos_detalhes || []).filter((a) => a.id !== anexoId)
+  } catch (err) {
+    uiStore.showToast('error', extractError(err))
+  }
+}
+
+const deleteTask = async () => {
+  if (!task.value || !confirm(`Excluir o chamado #${task.value.id}? Esta ação não pode ser desfeita.`)) return
+  deleting.value = true
+  try {
+    await tasksApi.remove(task.value.id)
+    uiStore.showToast('success', 'Chamado excluído.')
+    router.push('/tasks')
+  } catch (err) {
+    uiStore.showToast('error', extractError(err))
+  } finally {
+    deleting.value = false
+  }
+}
+
+onMounted(() => loadTask())
 </script>

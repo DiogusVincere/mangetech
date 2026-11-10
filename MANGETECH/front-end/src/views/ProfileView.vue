@@ -147,22 +147,21 @@
             </div>
             <div class="px-6 py-5">
               <div class="flow-root">
-                <ul class="space-y-6">
-                  <li v-for="(activity, index) in recentActivities" :key="index" class="relative">
-                    <div v-if="index < recentActivities.length - 1" class="absolute left-4 top-8 -ml-px h-full w-0.5 bg-gray-200"></div>
-                    <div class="relative flex items-start gap-3">
-                      <div class="flex-shrink-0">
-                        <div :class="['h-8 w-8 rounded-full flex items-center justify-center', activity.color]">
-                          <component :is="activity.icon" :size="16" class="text-white" />
-                        </div>
-                      </div>
-                      <div class="flex-1 min-w-0">
-                        <p class="text-sm font-medium text-gray-900">{{ activity.text }}</p>
-                        <p class="text-xs text-gray-500 mt-1">{{ activity.time }}</p>
-                      </div>
+                <ul v-if="stats?.atividades_recentes?.length" class="space-y-5">
+                  <li v-for="(a, index) in stats.atividades_recentes" :key="index" class="flex items-start gap-3">
+                    <div :class="['h-8 w-8 flex-shrink-0 rounded-full flex items-center justify-center', a.tipo === 'status' ? 'bg-purple-500' : 'bg-blue-500']">
+                      <component :is="a.tipo === 'status' ? Clock : ClipboardList" :size="16" class="text-white" />
+                    </div>
+                    <div class="flex-1 min-w-0">
+                      <router-link :to="`/tasks/${a.chamado_id}`" class="text-sm font-medium text-gray-900 hover:text-blue-600">
+                        {{ a.tipo === 'status' ? `Status: ${statusLabel(a.status || '')}` : 'Comentou' }} · #{{ a.chamado_id }} {{ a.chamado_titulo }}
+                      </router-link>
+                      <p class="text-sm text-gray-600 line-clamp-2">{{ a.texto }}</p>
+                      <p class="text-xs text-gray-500 mt-1">{{ timeAgo(a.data) }}</p>
                     </div>
                   </li>
                 </ul>
+                <p v-else class="text-sm text-gray-500">Você ainda não registrou atividades em chamados.</p>
               </div>
             </div>
           </section>
@@ -237,13 +236,6 @@
                 </div>
                 <ChevronRight :size="18" class="text-gray-400" />
               </button>
-              <button class="w-full flex items-center justify-between px-4 py-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition text-sm group">
-                <div class="flex items-center gap-3">
-                  <Bell :size="18" class="text-gray-400 group-hover:text-blue-600 transition" />
-                  <span class="font-medium text-gray-700 group-hover:text-gray-900">Notificações</span>
-                </div>
-                <ChevronRight :size="18" class="text-gray-400" />
-              </button>
             </div>
           </section>
 
@@ -255,20 +247,20 @@
             <div class="px-6 py-5">
               <div class="grid grid-cols-2 gap-4">
                 <div class="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div class="text-2xl font-bold text-blue-600">24</div>
+                  <div class="text-2xl font-bold text-blue-600">{{ stats?.total_chamados ?? 0 }}</div>
                   <div class="text-xs text-gray-600 mt-1">Chamados</div>
                 </div>
                 <div class="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                  <div class="text-2xl font-bold text-green-600">18</div>
+                  <div class="text-2xl font-bold text-green-600">{{ stats?.chamados_concluidos ?? 0 }}</div>
                   <div class="text-xs text-gray-600 mt-1">Concluídos</div>
                 </div>
                 <div class="text-center p-4 bg-yellow-50 rounded-lg border border-yellow-200">
-                  <div class="text-2xl font-bold text-yellow-600">6</div>
-                  <div class="text-xs text-gray-600 mt-1">Em Andamento</div>
+                  <div class="text-2xl font-bold text-yellow-600">{{ stats?.chamados_ativos ?? 0 }}</div>
+                  <div class="text-xs text-gray-600 mt-1">Em aberto</div>
                 </div>
                 <div class="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <div class="text-2xl font-bold text-purple-600">75%</div>
-                  <div class="text-xs text-gray-600 mt-1">Taxa Sucesso</div>
+                  <div class="text-2xl font-bold text-purple-600">{{ stats?.chamados_responsavel ?? 0 }}</div>
+                  <div class="text-xs text-gray-600 mt-1">Como responsável</div>
                 </div>
               </div>
             </div>
@@ -399,30 +391,23 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useAuthStore } from '@/stores/auth'
-import { useUiStore } from '@/stores/ui'
-import api from '@/api/client'
+import { onMounted, ref } from 'vue'
 import {
   UserCircle, Mail, Key, Shield, User, Crown, Clock, Save,
-  Lock, Eye, EyeOff, X, Bell, ChevronRight,
-  ClipboardList, CheckCircle, AlertCircle
+  Lock, Eye, EyeOff, X, ChevronRight, ClipboardList,
 } from 'lucide-vue-next'
+import { profileApi, extractError } from '@/api'
+import { useAuthStore } from '@/stores/auth'
+import { useUiStore } from '@/stores/ui'
+import type { UserStats } from '@/types'
+import { statusLabel, timeAgo } from '@/utils/display'
 
 const authStore = useAuthStore()
 const uiStore = useUiStore()
 
-const profileData = ref({
-  first_name: '',
-  last_name: '',
-  email: ''
-})
-
-const passwordData = ref({
-  current: '',
-  new: '',
-  confirm: ''
-})
+const profileData = ref({ first_name: '', last_name: '', email: '' })
+const passwordData = ref({ current: '', new: '', confirm: '' })
+const stats = ref<UserStats | null>(null)
 
 const loading = ref(false)
 const loadingProfile = ref(false)
@@ -432,109 +417,83 @@ const showCurrentPassword = ref(false)
 const showNewPassword = ref(false)
 const showConfirmPassword = ref(false)
 
-const recentActivities = ref([
-  {
-    icon: ClipboardList,
-    text: 'Atualizou suas informações pessoais',
-    time: 'Há 2 horas',
-    color: 'bg-blue-500'
-  },
-  {
-    icon: CheckCircle,
-    text: 'Alterou a senha da conta',
-    time: 'Há 1 dia',
-    color: 'bg-green-500'
-  },
-  {
-    icon: AlertCircle,
-    text: 'Login realizado com sucesso',
-    time: 'Há 2 dias',
-    color: 'bg-yellow-500'
-  },
-])
-
 const getFullName = () => {
   const fullName = `${profileData.value.first_name || ''} ${profileData.value.last_name || ''}`.trim()
   return fullName || authStore.user?.username || 'Usuário'
 }
 
 const getInitials = () => {
-  if (profileData.value.first_name && profileData.value.last_name) {
-    return `${profileData.value.first_name[0]}${profileData.value.last_name[0]}`.toUpperCase()
-  }
-  if (profileData.value.first_name) {
-    return profileData.value.first_name.substring(0, 2).toUpperCase()
-  }
-  if (authStore.user?.username) {
-    return authStore.user.username.substring(0, 2).toUpperCase()
-  }
-  return 'US'
+  const { first_name, last_name } = profileData.value
+  if (first_name && last_name) return `${first_name[0]}${last_name[0]}`.toUpperCase()
+  return (first_name || authStore.user?.username || 'US').substring(0, 2).toUpperCase()
 }
 
 const loadProfile = async () => {
   loading.value = true
   try {
-    const response = await api.get('/perfil/')
-    const data = response.data.data
+    const data = await profileApi.get()
     profileData.value = {
       first_name: data.first_name || '',
       last_name: data.last_name || '',
-      email: data.email || ''
+      email: data.email || '',
     }
   } catch (error) {
-    console.error('Erro ao carregar perfil:', error)
-    uiStore.showToast('error', 'Erro ao carregar perfil')
+    uiStore.showToast('error', extractError(error, 'Erro ao carregar o perfil'))
   } finally {
     loading.value = false
+  }
+  try {
+    stats.value = await profileApi.getStatistics()
+  } catch {
+    stats.value = null
   }
 }
 
 const handleUpdateProfile = async () => {
   loadingProfile.value = true
   try {
-    await api.put('/perfil/atualizar/', profileData.value)
-    uiStore.showToast('success', 'Perfil atualizado com sucesso!')
-    
-    // Atualizar dados do usuário no store
-    if (authStore.user) {
-      authStore.user.first_name = profileData.value.first_name
-      authStore.user.last_name = profileData.value.last_name
-      authStore.user.email = profileData.value.email
-    }
-  } catch (error: any) {
-    uiStore.showToast('error', error.response?.data?.message || 'Erro ao atualizar perfil')
+    const user = await profileApi.update(profileData.value)
+    authStore.setUser(user)
+    uiStore.showToast('success', 'Perfil atualizado.')
+  } catch (error) {
+    uiStore.showToast('error', extractError(error, 'Erro ao atualizar o perfil'))
   } finally {
     loadingProfile.value = false
   }
 }
 
 const handleChangePassword = async () => {
+  if (passwordData.value.new.length < 6) {
+    uiStore.showToast('error', 'A nova senha precisa ter pelo menos 6 caracteres.')
+    return
+  }
   if (passwordData.value.new !== passwordData.value.confirm) {
-    uiStore.showToast('error', 'As senhas não coincidem')
+    uiStore.showToast('error', 'As senhas não coincidem.')
     return
   }
 
   loadingPassword.value = true
   try {
-    await api.post('/perfil/alterar-senha/', {
-      senha_atual: passwordData.value.current,
-      nova_senha: passwordData.value.new,
-      confirmar_senha: passwordData.value.confirm
-    })
-    uiStore.showToast('success', 'Senha alterada com sucesso!')
+    const { token } = await profileApi.changePassword(
+      passwordData.value.current,
+      passwordData.value.new,
+      passwordData.value.confirm
+    )
+    // A API invalida o token antigo e devolve outro: sem guardar, a próxima
+    // requisição dava 401 e a pessoa era jogada para o login.
+    authStore.setToken(token)
+    uiStore.showToast('success', 'Senha alterada.')
     passwordData.value = { current: '', new: '', confirm: '' }
     showPasswordModal.value = false
     showCurrentPassword.value = false
     showNewPassword.value = false
     showConfirmPassword.value = false
-  } catch (error: any) {
-    uiStore.showToast('error', error.response?.data?.errors?.senha_atual?.[0] || 'Erro ao alterar senha')
+  } catch (error) {
+    uiStore.showToast('error', extractError(error, 'Erro ao alterar a senha'))
   } finally {
     loadingPassword.value = false
   }
 }
 
-onMounted(() => {
-  loadProfile()
-})
+onMounted(loadProfile)
 </script>

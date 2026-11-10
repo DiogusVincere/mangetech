@@ -170,9 +170,8 @@
 import { ref, computed, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
-import api from '@/api/client'
 import { Key, Eye, EyeOff } from 'lucide-vue-next'
-import { usersApi } from '@/api'
+import { authApi, extractError } from '@/api'
 
 const router = useRouter()
 const uiStore = useUiStore()
@@ -201,7 +200,7 @@ const isPasswordValid = computed(() => {
 })
 
 const maskEmail = (email: string) => {
-  const [user, domain] = email.split('@')
+  const [user = '', domain = ''] = email.split('@')
   if (user.length <= 2) return `${user}@${domain}`
   return `${user[0]}${'*'.repeat(user.length - 2)}${user[user.length - 1]}@${domain}`
 }
@@ -222,6 +221,7 @@ const handleTokenKeydown = (index: number, event: KeyboardEvent) => {
 }
 
 const startResendCooldown = () => {
+  if (cooldownInterval) clearInterval(cooldownInterval)
   resendCooldown.value = 60
   cooldownInterval = setInterval(() => {
     resendCooldown.value--
@@ -236,15 +236,13 @@ const handleSendCode = async () => {
   errorMessage.value = ''
 
   try {
-    await api.post('/auth/solicitar-recuperacao-senha/', {
-      email: formData.value.email
-    })
-
-    uiStore.showToast('success', 'Código enviado para seu email!')
+    formData.value.email = formData.value.email.trim()
+    await authApi.requestPasswordReset(formData.value.email)
+    uiStore.showToast('success', 'Se o e-mail estiver cadastrado, o código chega em instantes.')
     step.value = 2
     startResendCooldown()
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.message || 'Erro ao enviar código'
+    errorMessage.value = extractError(error, 'Erro ao enviar o código')
   } finally {
     loading.value = false
   }
@@ -256,15 +254,12 @@ const handleVerifyToken = async () => {
   errorMessage.value = ''
 
   try {
-    await api.post('/auth/verificar-token-recuperacao/', {
-      email: formData.value.email,
-      token: formData.value.token
-    })
+    await authApi.verifyResetToken(formData.value.email, formData.value.token)
 
     uiStore.showToast('success', 'Código verificado!')
     step.value = 3
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.message || 'Código inválido'
+    errorMessage.value = extractError(error, 'Código inválido')
     tokenDigits.value = ['', '', '', '', '', '']
     tokenInputs.value[0]?.focus()
   } finally {
@@ -279,17 +274,17 @@ const handleResetPassword = async () => {
   errorMessage.value = ''
 
   try {
-    await api.post('/auth/resetar-senha/', {
-      email: formData.value.email,
-      token: formData.value.token,
-      nova_senha: formData.value.newPassword,
-      confirmar_senha: formData.value.confirmPassword
-    })
+    await authApi.resetPassword(
+      formData.value.email,
+      formData.value.token,
+      formData.value.newPassword,
+      formData.value.confirmPassword
+    )
 
     uiStore.showToast('success', 'Senha redefinida com sucesso!')
     router.push('/login')
   } catch (error: any) {
-    errorMessage.value = error.response?.data?.message || 'Erro ao redefinir senha'
+    errorMessage.value = extractError(error, 'Erro ao redefinir a senha')
   } finally {
     loading.value = false
   }
