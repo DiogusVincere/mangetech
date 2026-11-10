@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import FileUploadArea from '../ui/FileUploadArea.vue'
-import { tasksApi } from '@/api'
+import { tasksApi, extractError } from '@/api'
 
 interface Props {
   isOpen: boolean
@@ -51,64 +51,23 @@ const handleClose = () => {
 }
 
 const handleSubmit = async () => {
-  // Validação
   if (!comentario.value.trim()) {
-    error.value = 'O comentário não pode estar vazio'
+    error.value = 'Escreva o comentário (as fotos vão junto com ele).'
     return
   }
 
   isSubmitting.value = true
   error.value = ''
-
   try {
-    // Sempre usa FormData para manter compatibilidade com fotos
     const formData = new FormData()
     formData.append('texto', comentario.value.trim())
-    
-    // Adiciona fotos se houver
-    console.log('📸 Total de fotos:', files.value.length)
-    files.value.forEach((file, index) => {
-      console.log(`📸 Foto ${index + 1}:`, {
-        name: file.name,
-        type: file.type,
-        size: file.size
-      })
-      formData.append('fotos', file)
-    })
-    
-    console.log('📤 Enviando comentário...')
-    const response = await tasksApi.addComment(props.chamadoId, formData)
-    console.log('Resposta:', response)
+    files.value.forEach((file) => formData.append('fotos', file))
 
-    if (response.success) {
-      emit('comment-added', response.comentario)
-      emit('close')
-    } else {
-      error.value = 'Erro ao adicionar comentário. Tente novamente.'
-    }
-  } catch (err: any) {
-    console.error('❌ Erro ao adicionar comentário:', err)
-    console.error('Detalhes:', {
-      status: err.response?.status,
-      data: err.response?.data
-    })
-    
-    // Mostra erros específicos do backend
-    if (err.response?.data?.errors) {
-      const errors = err.response.data.errors
-      const errorMessages = Object.entries(errors)
-        .map(([field, messages]: [string, any]) => {
-          if (Array.isArray(messages)) {
-            return messages.join(', ')
-          }
-          return messages
-        })
-        .join(' | ')
-      
-      error.value = errorMessages
-    } else {
-      error.value = err.response?.data?.message || err.response?.data?.detail || 'Erro ao adicionar comentário. Tente novamente.'
-    }
+    const response = await tasksApi.addComment(props.chamadoId, formData)
+    emit('comment-added', response.comentario)
+    emit('close')
+  } catch (err) {
+    error.value = extractError(err, 'Erro ao adicionar comentário. Tente novamente.')
   } finally {
     isSubmitting.value = false
   }
@@ -212,7 +171,7 @@ watch(() => props.isOpen, (newVal) => {
               </label>
               <FileUploadArea
                 accept="image/*"
-                :max-size="5"
+                :max-size="10"
                 :multiple="true"
                 :max-files="5"
                 :disabled="isSubmitting"
@@ -220,7 +179,7 @@ watch(() => props.isOpen, (newVal) => {
                 @files-removed="handleFilesRemoved"
               />
               <p class="mt-1 text-sm text-gray-500">
-                Você pode anexar até 5 fotos (máx. 5MB cada)
+                Você pode anexar até 5 fotos (máx. 10 MB cada)
               </p>
             </div>
           </div>

@@ -30,7 +30,14 @@ class Chamado(models.Model):
 
     titulo = models.CharField(max_length=255, verbose_name="Título")
     descricao = models.TextField(verbose_name="Descrição")
-    ativo = models.CharField(max_length=200, verbose_name="Ativo/Equipamento")
+    ativo = models.CharField(max_length=200, blank=True, verbose_name="Ativo/Equipamento")
+    # Vínculo real com o cadastro de ativos. O campo texto "ativo" continua
+    # existindo (app e chamados antigos mandam texto livre); quando o texto
+    # começa pelo código de um ativo cadastrado, o vínculo é feito no save().
+    ativo_ref = models.ForeignKey(
+        'Ativo', related_name='chamados', on_delete=models.SET_NULL,
+        null=True, blank=True, verbose_name="Ativo vinculado"
+    )
     ambiente = models.CharField(max_length=200, verbose_name="Ambiente", default="Não informado")
     
     solicitante = models.ForeignKey(
@@ -63,6 +70,15 @@ class Chamado(models.Model):
 
     def __str__(self):
         return f"#{self.id} - {self.titulo}"
+
+    def save(self, *args, **kwargs):
+        # Só na criação: depois disso, o vínculo muda pelo serializer, e um
+        # ativo_ref = None explícito (desvincular) precisa ser respeitado.
+        if self._state.adding and self.ativo_ref_id is None and self.ativo:
+            self.ativo_ref = Ativo.buscar_por_texto(self.ativo)
+        elif self.ativo_ref_id and not (self.ativo or '').strip():
+            self.ativo = f"{self.ativo_ref.codigo} - {self.ativo_ref.nome}"[:200]
+        super().save(*args, **kwargs)
 
     def delete(self, *args, **kwargs):
         if self.status == 'EM ANDAMENTO':
@@ -189,6 +205,13 @@ class Ativo(models.Model):
     ambiente = models.CharField(
         max_length=200, verbose_name="Ambiente/Localização", default="Não informado"
     )
+
+    data_aquisicao = models.DateField(null=True, blank=True, verbose_name="Data de Aquisição")
+    valor = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True, verbose_name="Valor (R$)"
+    )
+    garantia_meses = models.PositiveIntegerField(null=True, blank=True, verbose_name="Garantia (meses)")
+    observacoes = models.TextField(blank=True, verbose_name="Observações")
     
     status = models.CharField(
         max_length=20, choices=STATUS_CHOICES, default='Ativo',
@@ -205,6 +228,34 @@ class Ativo(models.Model):
 
     def __str__(self):
         return f"{self.codigo} - {self.nome}"
+
+    @property
+    def garantia_ate(self):
+        """Último dia da garantia (data de aquisição + meses), ou None."""
+        if not self.data_aquisicao or not self.garantia_meses:
+            return None
+        from calendar import monthrange
+        total = self.data_aquisicao.month - 1 + self.garantia_meses
+        ano, mes = self.data_aquisicao.year + total // 12, total % 12 + 1
+        dia = min(self.data_aquisicao.day, monthrange(ano, mes)[1])
+        return self.data_aquisicao.replace(year=ano, month=mes, day=dia)
+
+    @classmethod
+    def buscar_por_texto(cls, texto):
+        """Acha o ativo cujo código é o texto inteiro ou o começo dele.
+
+        Aceita "AST-001", "AST-001 - Compressor" e "AST-001 Compressor"; não
+        confunde AST-001 com AST-0010 porque exige separador depois do código.
+        """
+        texto = (texto or '').strip()
+        if not texto:
+            return None
+        exato = cls.objects.filter(codigo__iexact=texto).first()
+        if exato:
+            return exato
+        primeiro = texto.split()[0]
+        candidato = cls.objects.filter(codigo__iexact=primeiro).first()
+        return candidato
 
 
 class AtivoHistorico(models.Model):
@@ -240,7 +291,7 @@ class TokenRecuperacaoSenha(models.Model):
         User, on_delete=models.CASCADE, related_name='token_recuperacao'
     )
     
-    token = models.CharField(max_length=6, unique=True)
+    token = models.CharField(max_length=6)
     email_enviado_para = models.EmailField()
     
     tentativas = models.IntegerField(default=0)
@@ -293,19 +344,25 @@ class TokenRecuperacaoSenha(models.Model):
             return False
         return True
 
-    def verificar_token(self, token_fornecido: str):
-        """Verifica se o token fornecido está correto"""
+    def conferir(self, token_fornecido: str):
+        """Confere o código SEM consumi-lo (passo "verificar" da tela).
+
+        Erro conta tentativa; acerto não marca como usado, para o passo
+        seguinte (redefinir a senha) ainda aceitar o mesmo código.
+        """
         if not self.is_valido():
             return False
-        
-        if self.token != token_fornecido:
+        if not secrets.compare_digest(self.token, str(token_fornecido or '').strip()):
             self.tentativas += 1
-            self.save()
+            self.save(update_fields=['tentativas'])
             return False
-        
-        self.usado_em = timezone.now()
-        self.ativo = False
-        self.save()
+        return True
+
+    def verificar_token(self, token_fornecido: str):
+        """Confere o código e, se estiver certo, consome (uso único)."""
+        if not self.conferir(token_fornecido):
+            return False
+        self.marcar_como_usado()
         return True
 
     def marcar_como_usado(self):

@@ -414,7 +414,6 @@ const handleRegister = async () => {
   errorMessage.value = ''
 
   try {
-    console.log('📝 Iniciando registro...')
 
     await authStore.register(
       formData.value.name.trim(),
@@ -422,11 +421,8 @@ const handleRegister = async () => {
       formData.value.password
     )
 
-    console.log('Registro bem-sucedido!')
     
-    await authStore.fetchUser()
     
-    console.log('Usuário autenticado:', authStore.user)
 
     uiStore.showToast('success', `Bem-vindo(a), ${formData.value.name.split(' ')[0]}!`)
     
@@ -439,7 +435,6 @@ const handleRegister = async () => {
     }, 500)
 
   } catch (error: any) {
-    console.error('❌ Erro no registro:', error)
     
     if (error.response?.status === 400) {
       const errorData = error.response.data

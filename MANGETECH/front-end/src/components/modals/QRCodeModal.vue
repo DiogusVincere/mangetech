@@ -108,9 +108,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import api from '@/api/client'
+import { onUnmounted, ref, watch } from 'vue'
 import { X, Download, Printer, AlertCircle } from 'lucide-vue-next'
+import { assetsApi, extractError } from '@/api'
 
 interface Props {
   isOpen: boolean
@@ -118,130 +118,73 @@ interface Props {
 }
 
 interface QRCodeData {
-  qr_code: string // base64 com data:image/png;base64,...
+  qr_code: string // data:image/png;base64,...
   ativo_codigo: string
   ativo_nome: string
   ativo_modelo: string
-  formato?: string
+  ativo_ambiente: string
 }
 
 const props = defineProps<Props>()
-const emit = defineEmits<{
-  'close': []
-}>()
+const emit = defineEmits<{ close: [] }>()
 
 const qrCodeData = ref<QRCodeData | null>(null)
 const isLoading = ref(false)
 const error = ref('')
 
-// Carrega QR Code quando o modal abre
-watch(() => props.isOpen, async (newVal) => {
-  console.log('Modal isOpen changed:', newVal)
-  console.log('Ativo ID:', props.ativoId)
-  
-  if (newVal) {
-    console.log('🚀 Carregando QR Code...')
-    await loadQRCode()
-  } else {
-    // Limpa dados quando fecha
-    console.log('🧹 Limpando dados do modal')
-    qrCodeData.value = null
-    error.value = ''
-  }
-})
-
 const loadQRCode = async () => {
-  console.log('📥 Iniciando loadQRCode...')
+  if (!props.ativoId) return
   isLoading.value = true
   error.value = ''
-
   try {
-    console.log('🌐 Fazendo request para API:', `/ativos/${props.ativoId}/qr-code/`)
-    const response = await api.get(`/ativos/${props.ativoId}/qr-code/`)
-    console.log('Response da API:', response.data)
-
-    if (response.data.success) {
-      qrCodeData.value = {
-        qr_code: response.data.qr_code,
-        ativo_codigo: response.data.ativo_codigo,
-        ativo_nome: response.data.ativo_nome || 'N/A',
-        ativo_modelo: response.data.ativo_modelo || 'N/A',
-        formato: response.data.formato || 'PNG'
-      }
-      console.log('QR Code carregado:', qrCodeData.value)
-    } else {
-      error.value = 'Erro ao carregar QR Code'
-      console.error('❌ Response.data.success = false')
-    }
-  } catch (err: any) {
-    console.error('❌ Erro na API:', err)
-    
-    // MOCK TEMPORÁRIO
-    console.warn('Usando dados mock temporários')
-    
-    const canvas = document.createElement('canvas')
-    canvas.width = 256
-    canvas.height = 256
-    const ctx = canvas.getContext('2d')
-    
-    if (ctx) {
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(0, 0, 256, 256)
-      
-      ctx.fillStyle = '#000000'
-      const size = 8
-      for (let i = 0; i < 32; i++) {
-        for (let j = 0; j < 32; j++) {
-          if (Math.random() > 0.5) {
-            ctx.fillRect(i * size, j * size, size, size)
-          }
-        }
-      }
-      
-      ctx.fillStyle = '#ffffff'
-      ctx.fillRect(80, 100, 96, 56)
-      ctx.fillStyle = '#000000'
-      ctx.font = 'bold 14px Arial'
-      ctx.textAlign = 'center'
-      ctx.fillText('ATIVO', 128, 120)
-      ctx.fillText(`#${props.ativoId}`, 128, 140)
-    }
-    
+    const data = await assetsApi.getQRCode(props.ativoId)
     qrCodeData.value = {
-      qr_code: canvas.toDataURL('image/png'),
-      ativo_codigo: `ATIVO-${props.ativoId}`,
-      ativo_nome: 'Equipamento de Teste',
-      ativo_modelo: 'Modelo Mock',
-      formato: 'PNG'
+      qr_code: data.qr_code,
+      ativo_codigo: data.ativo_codigo,
+      ativo_nome: data.ativo_nome || '',
+      ativo_modelo: data.ativo_modelo || '',
+      ativo_ambiente: data.ativo_ambiente || '',
     }
-    
-    console.log('Mock QR Code gerado:', qrCodeData.value)
+  } catch (err) {
+    qrCodeData.value = null
+    error.value = extractError(err, 'Não foi possível gerar o QR code.')
   } finally {
     isLoading.value = false
-    console.log('loadQRCode finalizado. isLoading:', isLoading.value, 'qrCodeData:', qrCodeData.value)
   }
 }
 
-const handleClose = () => {
+// Carrega quando abre (e quando o id chega depois, como logo após cadastrar).
+watch(
+  () => [props.isOpen, props.ativoId] as const,
+  ([aberto, id]) => {
+    if (aberto && id) {
+      loadQRCode()
+      window.addEventListener('keydown', handleEscKey)
+    } else if (!aberto) {
+      qrCodeData.value = null
+      error.value = ''
+      window.removeEventListener('keydown', handleEscKey)
+    }
+  },
+  { immediate: true }
+)
+
+onUnmounted(() => window.removeEventListener('keydown', handleEscKey))
+
+function handleClose() {
   emit('close')
 }
 
-const handleBackdropClick = (e: MouseEvent) => {
-  if (e.target === e.currentTarget) {
-    handleClose()
-  }
+function handleBackdropClick(e: MouseEvent) {
+  if (e.target === e.currentTarget) handleClose()
 }
 
-const handleEscKey = (e: KeyboardEvent) => {
-  if (e.key === 'Escape' && props.isOpen) {
-    handleClose()
-  }
+function handleEscKey(e: KeyboardEvent) {
+  if (e.key === 'Escape' && props.isOpen) handleClose()
 }
 
-// Baixar QR Code como PNG
 const handleDownload = () => {
   if (!qrCodeData.value) return
-
   const link = document.createElement('a')
   link.href = qrCodeData.value.qr_code
   link.download = `qrcode-${qrCodeData.value.ativo_codigo}.png`
@@ -250,118 +193,36 @@ const handleDownload = () => {
   document.body.removeChild(link)
 }
 
-// Imprimir QR Code
-const handlePrint = () => {
-  if (!qrCodeData.value) return
+const escapeHtml = (texto: string) =>
+  texto.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] as string)
 
-  const printWindow = window.open('', '_blank')
-  if (!printWindow) {
-    alert('Por favor, permita pop-ups para imprimir')
+// Etiqueta para imprimir e colar no equipamento.
+const handlePrint = () => {
+  const qr = qrCodeData.value
+  if (!qr) return
+  const janela = window.open('', '_blank', 'width=480,height=640')
+  if (!janela) {
+    error.value = 'O navegador bloqueou a janela de impressão. Libere pop-ups para este site.'
     return
   }
-
-  const printContent = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <title>QR Code - ${qrCodeData.value.ativo_codigo}</title>
-        <style>
-          * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 40px;
-          }
-          .container {
-            text-align: center;
-            border: 2px solid #000;
-            padding: 30px;
-            border-radius: 8px;
-          }
-          h1 {
-            font-size: 24px;
-            margin-bottom: 10px;
-            color: #333;
-          }
-          .info {
-            margin-bottom: 20px;
-            color: #666;
-          }
-          .info-item {
-            margin: 5px 0;
-            font-size: 14px;
-          }
-          .info-label {
-            font-weight: bold;
-            color: #333;
-          }
-          img {
-            max-width: 400px;
-            width: 100%;
-            height: auto;
-            margin-top: 10px;
-          }
-          .footer {
-            margin-top: 20px;
-            font-size: 12px;
-            color: #999;
-          }
-          @media print {
-            body {
-              padding: 0;
-            }
-            .container {
-              border: 2px solid #000;
-            }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <h1>QR Code do Ativo</h1>
-          <div class="info">
-            <div class="info-item">
-              <span class="info-label">Código:</span> ${qrCodeData.value.ativo_codigo}
-            </div>
-            <div class="info-item">
-              <span class="info-label">Nome:</span> ${qrCodeData.value.ativo_nome}
-            </div>
-            <div class="info-item">
-              <span class="info-label">Modelo:</span> ${qrCodeData.value.ativo_modelo}
-            </div>
-          </div>
-          <img src="${qrCodeData.value.qr_code}" alt="QR Code">
-          <div class="footer">
-            Escaneie este código para acessar informações do ativo
-          </div>
-        </div>
-      </body>
-    </html>
-  `
-
-  printWindow.document.write(printContent)
-  printWindow.document.close()
-  
-  // Adiciona evento de impressão após carregar
-  printWindow.onload = () => {
-    printWindow.print()
-  }
+  const codigo = escapeHtml(qr.ativo_codigo)
+  const linhas = [qr.ativo_nome, qr.ativo_modelo, qr.ativo_ambiente].filter(Boolean).map(escapeHtml)
+  janela.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>QR ${codigo}</title>
+<style>
+  body{font-family:Arial,sans-serif;display:flex;justify-content:center;padding:24px;margin:0}
+  .etiqueta{border:2px solid #000;border-radius:8px;padding:20px;text-align:center;width:320px}
+  img{width:100%;height:auto}
+  .info{font-size:13px;color:#333;margin-top:8px;line-height:1.5}
+  .marca{font-size:11px;color:#777;margin-top:10px}
+  @media print{body{padding:0}}
+</style></head><body>
+<div class="etiqueta">
+  <img id="qr" src="${qr.qr_code}" alt="QR code ${codigo}">
+  <div class="info">${linhas.join('<br>')}</div>
+  <div class="marca">MangeTech · escaneie para abrir o ativo</div>
+</div>
+<script>document.getElementById('qr').onload=function(){window.focus();window.print();}<\/script>
+</body></html>`)
+  janela.document.close()
 }
-
-// Adiciona listener para ESC
-watch(() => props.isOpen, (newVal) => {
-  if (newVal) {
-    window.addEventListener('keydown', handleEscKey)
-  } else {
-    window.removeEventListener('keydown', handleEscKey)
-  }
-})
 </script>

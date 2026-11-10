@@ -126,15 +126,15 @@
               <td class="px-6 py-4 whitespace-nowrap">
                 <span v-if="user.is_superuser" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-800 border border-red-200">
                   <Crown :size="14" class="mr-1" />
-                  Super Admin
+                  {{ roleLabel(user) }}
                 </span>
                 <span v-else-if="user.is_staff" class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-800 border border-purple-200">
                   <Shield :size="14" class="mr-1" />
-                  Administrador
+                  {{ roleLabel(user) }}
                 </span>
                 <span v-else class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-800 border border-blue-200">
                   <User :size="14" class="mr-1" />
-                  Usuário
+                  {{ roleLabel(user) }}
                 </span>
               </td>
               <td class="px-6 py-4 whitespace-nowrap">
@@ -185,6 +185,7 @@
 </template>
 
 <script setup lang="ts">
+import { roleLabel } from '@/utils/display'
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usersApi } from '@/api'

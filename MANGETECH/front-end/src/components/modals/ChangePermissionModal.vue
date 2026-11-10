@@ -17,24 +17,28 @@
           <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition" :class="{'border-blue-500 bg-blue-50': selectedRole === 'requester'}">
             <input type="radio" v-model="selectedRole" value="requester" class="h-4 w-4 text-blue-600 focus:ring-blue-500">
             <div class="ml-3">
-              <span class="block text-sm font-medium text-gray-900">Solicitante (Padrão)</span>
-              <span class="block text-xs text-gray-500">Apenas abre chamados e visualiza os seus.</span>
+              <span class="block text-sm font-medium text-gray-900">Usuário (padrão)</span>
+              <span class="block text-xs text-gray-500">Abre chamados e vê os que abriu ou em que é responsável; atende os atribuídos a ele e edita ativos.</span>
             </div>
           </label>
 
           <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition" :class="{'border-purple-500 bg-purple-50': selectedRole === 'technician'}">
             <input type="radio" v-model="selectedRole" value="technician" class="h-4 w-4 text-purple-600 focus:ring-purple-500">
             <div class="ml-3">
-              <span class="block text-sm font-medium text-gray-900">Técnico</span>
-              <span class="block text-xs text-gray-500">Pode atender chamados e gerenciar ativos.</span>
+              <span class="block text-sm font-medium text-gray-900">Administrador</span>
+              <span class="block text-xs text-gray-500">Vê todos os chamados e o dashboard, cadastra/exclui ativos e gerencia usuários.</span>
             </div>
           </label>
 
-          <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 transition" :class="{'border-red-500 bg-red-50': selectedRole === 'admin'}">
-            <input type="radio" v-model="selectedRole" value="admin" class="h-4 w-4 text-red-600 focus:ring-red-500">
+          <label
+            v-if="canGrantSuperuser || isSuperuser"
+            class="flex items-center p-3 border rounded-lg transition"
+            :class="[{'border-red-500 bg-red-50': selectedRole === 'admin'}, canGrantSuperuser ? 'cursor-pointer hover:bg-gray-50' : 'opacity-60 cursor-not-allowed']"
+          >
+            <input type="radio" v-model="selectedRole" value="admin" :disabled="!canGrantSuperuser" class="h-4 w-4 text-red-600 focus:ring-red-500">
             <div class="ml-3">
-              <span class="block text-sm font-medium text-gray-900">Administrador</span>
-              <span class="block text-xs text-gray-500">Acesso total ao sistema e configurações.</span>
+              <span class="block text-sm font-medium text-gray-900">Superusuário</span>
+              <span class="block text-xs text-gray-500">Tudo do administrador, mais o admin do Django e promover superusuários.</span>
             </div>
           </label>
         </div>
@@ -64,6 +68,7 @@ const props = defineProps<{
   isStaff: boolean
   isSuperuser: boolean
   isSubmitting: boolean
+  canGrantSuperuser?: boolean
 }>()
 
 const emit = defineEmits(['close', 'save'])

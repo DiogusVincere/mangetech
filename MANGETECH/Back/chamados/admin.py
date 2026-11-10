@@ -54,10 +54,11 @@ class ChamadoAdmin(admin.ModelAdmin):
     search_fields = ('titulo', 'descricao', 'ativo', 'id')
     readonly_fields = ('data_criacao', 'data_atualizacao')
     filter_horizontal = ('responsaveis',)
+    autocomplete_fields = ('ativo_ref',)
     
     fieldsets = (
         ('Informações Básicas', {
-            'fields': ('titulo', 'descricao', 'ativo', 'ambiente')
+            'fields': ('titulo', 'descricao', 'ativo', 'ativo_ref', 'ambiente')
         }),
         ('Responsabilidade', {
             'fields': ('solicitante', 'responsaveis')
@@ -78,7 +79,7 @@ class ChamadoAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         return super().get_queryset(request).select_related(
-            'solicitante'
+            'solicitante', 'ativo_ref'
         ).prefetch_related('responsaveis')
 
 
@@ -149,6 +150,9 @@ class AtivoAdmin(admin.ModelAdmin):
         }),
         ('Detalhes Técnicos', {
             'fields': ('fabricante', 'numero_serie', 'fornecedor')
+        }),
+        ('Aquisição', {
+            'fields': ('data_aquisicao', 'valor', 'garantia_meses', 'observacoes')
         }),
         ('Localização e Status', {
             'fields': ('ambiente', 'status')

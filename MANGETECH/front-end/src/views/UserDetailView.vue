@@ -40,15 +40,15 @@
                 
                 <span v-if="user.is_superuser" class="px-3 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 border border-red-200 flex items-center">
                   <Crown :size="14" class="mr-1" />
-                  Super Admin
+                  {{ roleLabel(user) }}
                 </span>
                 <span v-else-if="user.is_staff" class="px-3 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800 border border-purple-200 flex items-center">
-                  <Wrench :size="14" class="mr-1" />
-                  Técnico
+                  <Shield :size="14" class="mr-1" />
+                  {{ roleLabel(user) }}
                 </span>
                 <span v-else class="px-3 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 border border-blue-200 flex items-center">
                   <UserIcon :size="14" class="mr-1" />
-                  Solicitante
+                  {{ roleLabel(user) }}
                 </span>
               </div>
             </div>
@@ -101,8 +101,8 @@
                   <h4 class="text-sm font-semibold text-gray-900 mb-3">Chamados por Status</h4>
                   <div v-if="stats.por_status && stats.por_status.length > 0" class="space-y-3">
                     <div v-for="item in stats.por_status" :key="item.status" class="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
-                      <span :class="['px-3 py-1 text-xs rounded-full font-bold uppercase tracking-wide', getStatusColor(item.status)]">
-                        {{ item.status }}
+                      <span :class="['px-3 py-1 text-xs rounded-full font-bold uppercase tracking-wide', statusClass(item.status)]">
+                        {{ statusLabel(item.status) }}
                       </span>
                       <span class="text-lg font-bold text-gray-900">{{ item.total }}</span>
                     </div>
@@ -114,7 +114,7 @@
                   <h4 class="text-sm font-semibold text-gray-900 mb-3">Chamados por Urgência</h4>
                   <div v-if="stats.por_urgencia && stats.por_urgencia.length > 0" class="space-y-3">
                     <div v-for="item in stats.por_urgencia" :key="item.urgencia" class="flex items-center justify-between bg-gray-50 px-4 py-3 rounded-lg border border-gray-100">
-                      <span :class="['px-3 py-1 text-xs rounded-full font-bold', getPriorityColor(item.urgencia)]">
+                      <span :class="['px-3 py-1 text-xs rounded-full font-bold', priorityClass(item.urgencia)]">
                         {{ item.urgencia }}
                       </span>
                       <span class="text-lg font-bold text-gray-900">{{ item.total }}</span>
@@ -134,30 +134,21 @@
             
             <div class="px-6 py-8">
               <div class="flow-root">
-                <ul class="-my-5">
-                  <li v-for="(activity, index) in recentActivities" :key="index" class="relative pb-10 last:pb-0">
-                    <div 
-                      v-if="index !== recentActivities.length - 1" 
-                      class="absolute top-8 left-5 -ml-px h-full w-0.5 bg-gray-200" 
-                      aria-hidden="true"
-                    ></div>
-                    
-                    <div class="relative flex items-start space-x-4">
-                      <div class="relative">
-                        <div :class="['h-10 w-10 rounded-full flex items-center justify-center ring-4 ring-white shadow-sm', activity.bgClass]">
-                          <component :is="activity.icon" :size="18" class="text-white" />
-                        </div>
-                      </div>
-                      
-                      <div class="min-w-0 flex-1 pt-1.5">
-                        <div>
-                          <p class="text-sm font-semibold text-gray-900">{{ activity.text }}</p>
-                          <p class="text-xs text-gray-500 mt-1">{{ activity.time }}</p>
-                        </div>
-                      </div>
+                <ul v-if="stats?.atividades_recentes?.length" class="space-y-5">
+                  <li v-for="(a, index) in stats.atividades_recentes" :key="index" class="flex items-start gap-4">
+                    <div :class="['h-10 w-10 flex-shrink-0 rounded-full flex items-center justify-center', a.tipo === 'status' ? 'bg-purple-500' : 'bg-blue-500']">
+                      <component :is="a.tipo === 'status' ? Clock : ClipboardList" :size="18" class="text-white" />
+                    </div>
+                    <div class="min-w-0 flex-1">
+                      <router-link :to="`/tasks/${a.chamado_id}`" class="text-sm font-semibold text-gray-900 hover:text-blue-600">
+                        {{ a.tipo === 'status' ? `Status: ${statusLabel(a.status || '')}` : 'Comentou' }} · #{{ a.chamado_id }} {{ a.chamado_titulo }}
+                      </router-link>
+                      <p class="text-sm text-gray-600 line-clamp-2">{{ a.texto }}</p>
+                      <p class="text-xs text-gray-500 mt-1">{{ timeAgo(a.data) }}</p>
                     </div>
                   </li>
                 </ul>
+                <p v-else class="text-sm text-gray-500 text-center">Nenhuma atividade registrada.</p>
               </div>
             </div>
           </section>
@@ -196,7 +187,7 @@
               <div>
                 <dt class="text-sm font-medium text-gray-500">Membro desde</dt>
                 <dd class="mt-1 text-sm text-gray-900">
-                  {{ user.date_joined ? formatDate(user.date_joined) : 'N/A' }}
+                  {{ formatDate(user.date_joined) }}
                 </dd>
               </div>
             </div>
@@ -249,6 +240,7 @@
       :is-staff="user.is_staff"
       :is-superuser="user.is_superuser"
       :is-submitting="permissionLoading"
+      :can-grant-superuser="!!authStore.user?.is_superuser"
       @close="showPermissionModal = false"
       @save="handlePermissionChange"
     />
@@ -257,54 +249,32 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import { useUiStore } from '@/stores/ui'
 import { useAuthStore } from '@/stores/auth'
-import { usersApi, authApi } from '@/api'
-import { formatDate } from '@/utils/formatters'
-import { getStatusColor, getPriorityColor } from '@/utils/helpers'
+import { usersApi, authApi, extractError } from '@/api'
+import { formatDate, priorityClass, statusClass, statusLabel, timeAgo, roleLabel } from '@/utils/display'
 import ChangePermissionModal from '@/components/modals/ChangePermissionModal.vue'
 import {
   ArrowLeft, Mail, Shield, Key, Ban, Crown,
   ClipboardList, CheckCircle, AlertCircle, Clock,
-  User as UserIcon, Wrench
+  User as UserIcon
 } from 'lucide-vue-next'
-import type { User } from '@/types'
+import type { User, UserStats } from '@/types'
 
 const route = useRoute()
-const router = useRouter()
 const uiStore = useUiStore()
 const authStore = useAuthStore()
 
 const user = ref<User | null>(null)
-const stats = ref<any>(null)
+const stats = ref<UserStats | null>(null)
 const loading = ref(false)
 const statsLoading = ref(false)
 const permissionLoading = ref(false)
 const error = ref('')
 const showPermissionModal = ref(false)
 
-// MOCK: Atividades Recentes (exatamente como nas imagens)
-const recentActivities = ref([
-  {
-    icon: ClipboardList,
-    text: 'Criou um novo chamado',
-    time: 'Há 2 horas',
-    bgClass: 'bg-blue-500' // Azul para criação
-  },
-  {
-    icon: CheckCircle,
-    text: 'Concluiu um chamado',
-    time: 'Há 5 horas',
-    bgClass: 'bg-green-500' // Verde para conclusão
-  },
-  {
-    icon: Clock,
-    text: 'Atualizou status de chamado',
-    time: 'Há 1 dia',
-    bgClass: 'bg-yellow-500' // Amarelo para atualização
-  },
-])
+
 
 const getFullName = (user: User) => {
   const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim()
@@ -331,7 +301,7 @@ const loadUser = async () => {
     await loadUserStats(userId)
   } catch (err: any) {
     console.error('Erro:', err)
-    error.value = err.message || 'Erro ao carregar usuário'
+    error.value = extractError(err, 'Erro ao carregar usuário')
     uiStore.showToast('error', error.value)
   } finally {
     loading.value = false
@@ -341,10 +311,7 @@ const loadUser = async () => {
 const loadUserStats = async (userId: number) => {
   statsLoading.value = true
   try {
-    const response = await usersApi.getStatistics(userId)
-    if (response.success) {
-      stats.value = response.data
-    }
+    stats.value = await usersApi.getStatistics(userId)
   } catch (err) {
     console.warn('Estatísticas indisponíveis')
   } finally {
@@ -381,7 +348,7 @@ const handlePermissionChange = async (role: string) => {
     showPermissionModal.value = false
   } catch (err) {
     console.error(err)
-    uiStore.showToast('error', 'Erro ao alterar permissões.')
+    uiStore.showToast('error', extractError(err, 'Erro ao alterar permissões.'))
   } finally {
     permissionLoading.value = false
   }
@@ -401,7 +368,7 @@ const toggleUserStatus = async () => {
     user.value.is_active = !user.value.is_active
     uiStore.showToast('success', `Usuário ${user.value.is_active ? 'ativado' : 'desativado'} com sucesso!`)
   } catch (err) {
-    uiStore.showToast('error', 'Erro ao alterar status do usuário')
+    uiStore.showToast('error', extractError(err, 'Erro ao alterar status do usuário'))
   }
 }
 
@@ -413,9 +380,9 @@ const sendResetEmail = async () => {
   
   try {
     await authApi.requestPasswordReset(user.value.email)
-    uiStore.showToast('success', `Email de recuperação enviado para ${user.value.email}`)
+    uiStore.showToast('success', `Código de recuperação enviado para ${user.value.email}`)
   } catch (err) {
-    uiStore.showToast('error', 'Erro ao enviar email de recuperação')
+    uiStore.showToast('error', extractError(err, 'Erro ao enviar e-mail de recuperação'))
   }
 }
 

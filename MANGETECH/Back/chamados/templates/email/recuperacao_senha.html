@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="pt-BR">
+<body style="margin:0;padding:24px;background:#f3f4f6;font-family:Arial,Helvetica,sans-serif;color:#111827">
+  <table role="presentation" width="100%" style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px">
+    <tr><td>
+      <h1 style="margin:0 0 16px;font-size:20px;color:#1d4ed8">MangeTech</h1>
+      <p style="margin:0 0 12px">Olá, {{ usuario }}.</p>
+      <p style="margin:0 0 20px">Use o código abaixo para redefinir sua senha. Ele vale por {{ tempo_expiracao }} minutos.</p>
+      <p style="margin:0 0 20px;font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;background:#eff6ff;border-radius:8px;padding:16px">{{ token }}</p>
+      <p style="margin:0 0 12px">Digite o código na tela de recuperação: {{ link }}</p>
+      <p style="margin:0;color:#6b7280;font-size:13px">Se você não pediu a troca de senha, ignore este e-mail: sua senha continua a mesma.</p>
+    </td></tr>
+  </table>
+</body>
+</html>

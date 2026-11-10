@@ -1,9 +1,10 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  content: [
-    "./index.html",
-    "./src/**/*.{vue,js,ts,jsx,tsx}",
-  ],
+  // relative: caminhos relativos a este arquivo, não à pasta de onde o Vite roda.
+  content: {
+    relative: true,
+    files: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
+  },
   theme: {
     extend: {
       colors: {

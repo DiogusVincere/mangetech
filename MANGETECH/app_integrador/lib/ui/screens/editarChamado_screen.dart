@@ -22,7 +22,7 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
   late TextEditingController _ativoController;
   late TextEditingController _ambienteController;
   late TextEditingController _descricaoController;
-  
+
   late String _urgencia;
   late String _status;
   DateTime? _dataSugerida;
@@ -62,17 +62,22 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
   }
 
   Future<void> _selectDate() async {
+    final agora = DateTime.now();
+    final inicial = _dataSugerida ?? agora;
     final DateTime? picked = await showDatePicker(
       context: context,
-      initialDate: _dataSugerida ?? DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      initialDate: inicial,
+      // Prazo já vencido precisa continuar selecionável (senão o picker quebra).
+      firstDate: inicial.isBefore(agora) ? inicial : agora,
+      lastDate: inicial.isAfter(agora.add(const Duration(days: 365)))
+          ? inicial
+          : agora.add(const Duration(days: 365)),
     );
 
     if (picked != null) {
       final TimeOfDay? time = await showTimePicker(
         context: context,
-        initialTime: _dataSugerida != null 
+        initialTime: _dataSugerida != null
             ? TimeOfDay.fromDateTime(_dataSugerida!)
             : TimeOfDay.now(),
       );
@@ -103,24 +108,35 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
 
       try {
         final chamadoProvider = Provider.of<ChamadoProvider>(context, listen: false);
-        
+
         // Formatar data para Django (ISO 8601)
         String? dataSugeridaFormatada;
         if (_dataSugerida != null) {
           dataSugeridaFormatada = _dataSugerida!.toIso8601String();
         }
 
-        // Atualizar chamado via API
-        // TODO: Implementar método de atualização no provider
-        // Por enquanto, vamos apenas mudar o status se necessário
-        
+        // Salva título, descrição, ativo, local, urgência e prazo.
+        final salvou = await chamadoProvider.updateChamado(
+          chamadoId: widget.chamado.id,
+          titulo: _tituloController.text.trim(),
+          descricao: _descricaoController.text.trim(),
+          ativo: _ativoController.text.trim(),
+          ambiente: _ambienteController.text.trim(),
+          urgencia: _urgencia,
+          dataSugerida: dataSugeridaFormatada,
+        );
+        if (!salvou) {
+          throw Exception(chamadoProvider.error ?? 'Erro ao salvar o chamado');
+        }
+
+        // O status passa pelo fluxo próprio, que registra o histórico.
         if (_status != widget.chamado.status) {
           final success = await chamadoProvider.mudarStatus(
             chamadoId: widget.chamado.id,
             novoStatus: _status,
             descricao: 'Status alterado via edição do chamado',
           );
-          
+
           if (!success) {
             throw Exception('Erro ao atualizar status');
           }
@@ -129,9 +145,9 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
         if (mounted) {
           setState(() => _isLoading = false);
           _showMessage('Chamado atualizado com sucesso!', isError: false);
-          
+
           await Future.delayed(const Duration(milliseconds: 500));
-          
+
           if (mounted) {
             Navigator.of(context).pop(true); // Retorna true para indicar sucesso
           }
@@ -171,7 +187,7 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
 
   void _showMessage(String message, {required bool isError}) {
     if (!mounted) return;
-    
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -348,8 +364,8 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
                                   : 'Nenhuma data definida',
                               style: TextStyle(
                                 fontSize: 13,
-                                color: _dataSugerida != null 
-                                    ? Colors.black87 
+                                color: _dataSugerida != null
+                                    ? Colors.black87
                                     : Colors.grey[500],
                               ),
                             ),
@@ -378,7 +394,7 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
                 children: _urgenciaOptions.map((option) {
                   final isSelected = _urgencia == option;
                   Color chipColor;
-                  
+
                   switch (option) {
                     case 'Crítico':
                       chipColor = Colors.red;
@@ -395,7 +411,7 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
                     default:
                       chipColor = Colors.grey;
                   }
-                  
+
                   return ChoiceChip(
                     label: Text(option),
                     selected: isSelected,
@@ -410,7 +426,7 @@ class _EditarChamadoScreenState extends State<EditarChamadoScreen> {
                       color: isSelected ? Colors.white : chipColor,
                       fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
                     ),
-                    avatar: isSelected 
+                    avatar: isSelected
                         ? const Icon(Icons.check, size: 18, color: Colors.white)
                         : null,
                   );

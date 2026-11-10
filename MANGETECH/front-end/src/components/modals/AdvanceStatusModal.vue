@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue'
 import FileUploadArea from '../ui/FileUploadArea.vue'
-import { tasksApi } from '@/api'
+import { tasksApi, extractError } from '@/api'
+import type { Task } from '@/types'
 
 interface Props {
   isOpen: boolean
@@ -10,12 +11,7 @@ interface Props {
 }
 
 interface StatusChange {
-  id?: number
-  status: string
-  descricao: string
-  data_mudanca: string
-  usuario: string
-  fotos: string[]
+  chamado: Task
 }
 
 const props = defineProps<Props>()
@@ -26,7 +22,7 @@ const emit = defineEmits<{
 
 const statusOptions = [
   { value: 'ABERTO', label: 'Aberto', color: 'blue' },
-  { value: 'AGUARDANDO RESP', label: 'Aguardando Resposta', color: 'yellow' },
+  { value: 'AGUARDANDO RESP', label: 'Aguardando responsáveis', color: 'yellow' },
   { value: 'EM ANDAMENTO', label: 'Em Andamento', color: 'purple' },
   { value: 'REALIZADO', label: 'Realizado', color: 'green' },
   { value: 'CONCLUÍDO', label: 'Concluído', color: 'gray' },
@@ -69,18 +65,10 @@ const handleClose = () => {
 }
 
 const handleSubmit = async () => {
-  // Validações
   if (!selectedStatus.value) {
     error.value = 'Selecione um status'
     return
   }
-
-  if (!descricao.value.trim()) {
-    error.value = 'A descrição é obrigatória'
-    return
-  }
-
-  
   if (descricao.value.trim().length < 10) {
     error.value = 'A descrição deve ter no mínimo 10 caracteres'
     return
@@ -88,55 +76,17 @@ const handleSubmit = async () => {
 
   isSubmitting.value = true
   error.value = ''
-
   try {
-    // Sempre usa FormData para manter compatibilidade com fotos
     const formData = new FormData()
     formData.append('status', selectedStatus.value)
     formData.append('descricao', descricao.value.trim())
-    
-    // Adiciona fotos se houver
-    files.value.forEach(file => {
-      formData.append('fotos', file)
-    })
+    files.value.forEach((file) => formData.append('fotos', file))
 
     const response = await tasksApi.changeStatus(props.chamadoId, formData)
-
-    if (response.success) {
-      emit('status-changed', {
-        status: selectedStatus.value,
-        descricao: descricao.value.trim(),
-        data_mudanca: new Date().toISOString(),
-        usuario: 'Você',
-        fotos: []
-      })
-      emit('close')
-    } else {
-      error.value = response.message || 'Erro ao mudar status. Tente novamente.'
-    }
-  } catch (err: any) {
-    console.error('❌ Erro ao mudar status:', err)
-    
-    // Mostra erro específico do backend
-    if (err.response?.data?.errors) {
-      const errors = err.response.data.errors
-      const errorMessages = Object.entries(errors)
-        .map(([field, messages]: [string, any]) => {
-          if (Array.isArray(messages)) {
-            return messages.join(', ')
-          }
-          return messages
-        })
-        .join(' | ')
-      
-      error.value = errorMessages
-    } else if (err.response?.data?.message) {
-      error.value = err.response.data.message
-    } else if (err.response?.data?.detail) {
-      error.value = err.response.data.detail
-    } else {
-      error.value = 'Erro ao mudar status. Tente novamente.'
-    }
+    emit('status-changed', { chamado: response.chamado })
+    emit('close')
+  } catch (err) {
+    error.value = extractError(err, 'Erro ao mudar status. Tente novamente.')
   } finally {
     isSubmitting.value = false
   }
@@ -298,7 +248,7 @@ const getStatusColorClasses = (color: string) => {
               </label>
               <FileUploadArea
                 accept="image/*"
-                :max-size="5"
+                :max-size="10"
                 :multiple="true"
                 :max-files="10"
                 :disabled="isSubmitting"
@@ -306,7 +256,7 @@ const getStatusColorClasses = (color: string) => {
                 @files-removed="handleFilesRemoved"
               />
               <p class="mt-1 text-sm text-gray-500">
-                Você pode anexar até 10 fotos do trabalho realizado (máx. 5MB cada)
+                Você pode anexar até 10 fotos do trabalho realizado (máx. 10 MB cada)
               </p>
             </div>
           </div>
