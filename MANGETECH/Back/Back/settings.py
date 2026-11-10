@@ -140,6 +140,11 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 # Media files (uploads: fotos de comentários, do histórico e anexos)
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+SERVE_MEDIA = _env_bool('SERVE_MEDIA', True)
+
+# Uploads grandes vão para arquivo temporário; acima disso o Django recusa.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 25 * 1024 * 1024
+FILE_UPLOAD_MAX_MEMORY_SIZE = 5 * 1024 * 1024
 
 STORAGES = {
     'default': {
@@ -181,8 +186,13 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'EXCEPTION_HANDLER': 'chamados.exceptions.tratar_excecao',
+    'DEFAULT_PAGINATION_CLASS': 'chamados.pagination.Paginacao',
     'PAGE_SIZE': 50,
+    # Limite por IP nos endpoints públicos de login, cadastro e recuperação de senha.
+    'DEFAULT_THROTTLE_RATES': {
+        'auth': os.environ.get('AUTH_THROTTLE_RATE', '30/min'),
+    },
     'DATETIME_FORMAT': '%Y-%m-%dT%H:%M:%S',
     'DATE_FORMAT': '%Y-%m-%d',
 }

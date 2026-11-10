@@ -1,194 +1,130 @@
-"""
-Serviço de Email para envio de tokens de recuperação
-"""
+"""Verificação de e-mail e envio dos e-mails de recuperação de senha."""
 
-import smtplib
-import dns.resolver
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import logging
+import re
+
 from django.conf import settings
-from django.core.mail import send_mail, EmailMultiAlternatives
+from django.core.mail import EmailMultiAlternatives
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
-import logging
 
 logger = logging.getLogger(__name__)
 
+_EMAIL_RE = re.compile(r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$')
+
 
 class VerificadorEmail:
-    """Verifica se um email é real e válido"""
-    
+    """Confere a sintaxe e se o domínio recebe e-mail (registro MX ou A).
+
+    Não tenta VRFY por SMTP: a maioria dos servidores bloqueia a porta 25 e a
+    checagem travava a requisição por vários segundos sem resposta útil.
+    """
+
+    TIMEOUT_DNS = 3.0
+
     @staticmethod
     def validar_sintaxe(email: str) -> bool:
-        """Valida a sintaxe básica do email"""
-        import re
-        pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        return re.match(pattern, email) is not None
-    
+        return bool(_EMAIL_RE.match(email or ''))
+
     @staticmethod
-    def validar_dominio(email: str) -> bool:
-        """Valida se o domínio do email existe"""
+    def validar_dominio(email: str) -> bool | None:
+        """True/False quando o DNS responde; None quando não deu para checar."""
         try:
-            dominio = email.split('@')[1]
-            # Tenta resolver o registro MX do domínio
-            dns.resolver.resolve(dominio, 'MX')
-            return True
-        except Exception as e:
-            logger.warning(f"Domínio inválido para {email}: {e}")
-            return False
-    
-    @staticmethod
-    def verificar_email_smtp(email: str) -> bool:
-        """
-        Verifica se o email existe via SMTP
-        (Pode gerar falsos positivos dependendo do servidor)
-        """
-        try:
-            dominio = email.split('@')[1]
-            
-            # Tentar conectar ao servidor SMTP
-            smtp_server = smtplib.SMTP(timeout=5)
-            smtp_server.connect(dominio)
-            smtp_server.ehlo(smtp_server.local_hostname)
-            
-            # Verificar se o email existe
-            code, message = smtp_server.vrfy(email)
-            smtp_server.quit()
-            
-            # Code 250 = existe, 550 = não existe
-            return code == 250
-        except Exception as e:
-            logger.warning(f"Erro ao verificar SMTP para {email}: {e}")
-            # Se não conseguir verificar, considera como válido
-            return True
-    
+            import dns.exception
+            import dns.resolver
+        except ImportError:
+            return None
+
+        dominio = email.rsplit('@', 1)[-1]
+        resolver = dns.resolver.Resolver()
+        resolver.lifetime = VerificadorEmail.TIMEOUT_DNS
+        resolver.timeout = VerificadorEmail.TIMEOUT_DNS
+        for tipo in ('MX', 'A'):
+            try:
+                resolver.resolve(dominio, tipo)
+                return True
+            except (dns.resolver.NXDOMAIN, dns.resolver.NoNameservers):
+                return False
+            except dns.resolver.NoAnswer:
+                continue
+            except dns.exception.DNSException as exc:  # timeout, rede fora
+                logger.warning('Não foi possível checar o domínio %s: %s', dominio, exc)
+                return None
+        return False
+
     @staticmethod
     def verificar_email_completo(email: str) -> dict:
-        """
-        Verificação completa do email
-        
-        Returns:
-            dict com resultado da verificação
-        """
         resultado = {
             'email': email,
             'valido': False,
             'sintaxe_ok': False,
             'dominio_ok': False,
-            'email_real': False,
-            'mensagem': ''
+            'mensagem': '',
         }
-        
-        # 1. Verificar sintaxe
         if not VerificadorEmail.validar_sintaxe(email):
-            resultado['mensagem'] = 'Sintaxe de email inválida'
+            resultado['mensagem'] = 'Formato de e-mail inválido.'
             return resultado
-        
         resultado['sintaxe_ok'] = True
-        
-        # 2. Verificar domínio
-        if not VerificadorEmail.validar_dominio(email):
-            resultado['mensagem'] = 'Domínio não existe'
+
+        dominio = VerificadorEmail.validar_dominio(email)
+        if dominio is False:
+            resultado['mensagem'] = 'O domínio do e-mail não existe ou não recebe e-mails.'
             return resultado
-        
-        resultado['dominio_ok'] = True
-        
-        # 3. Verificar SMTP
-        if VerificadorEmail.verificar_email_smtp(email):
-            resultado['email_real'] = True
-            resultado['valido'] = True
-            resultado['mensagem'] = 'Email válido e real'
-        else:
-            resultado['valido'] = False
-            resultado['mensagem'] = 'Email não encontrado no servidor'
-        
+
+        # dominio None = DNS indisponível: não bloqueia o usuário por isso.
+        resultado['dominio_ok'] = bool(dominio)
+        resultado['valido'] = True
+        resultado['mensagem'] = 'E-mail válido.' if dominio else 'Formato válido (domínio não verificado).'
         return resultado
 
 
 class EnviadorEmail:
-    """Envia emails de recuperação de senha"""
-    
+    """E-mails da recuperação de senha. Sem SMTP configurado, saem no console."""
+
     @staticmethod
-    def enviar_token_recuperacao(usuario, token_obj):
-        """
-        Envia token de recuperação por email
-        
-        Args:
-            usuario: Usuário Django
-            token_obj: TokenRecuperacaoSenha
-            
-        Returns:
-            True se enviado com sucesso
-        """
+    def _enviar(assunto: str, template: str, contexto: dict, para: str) -> bool:
         try:
-            # Contexto para o template
-            contexto = {
-                'usuario': usuario.get_full_name() or usuario.username,
-                'token': token_obj.token,
-                'email': token_obj.email_enviado_para,
-                'tempo_expiracao': 15,  # minutos
-                'link_reset': f"{settings.FRONTEND_URL}/resetar-senha/{token_obj.token}",
-            }
-            
-            # Renderizar template HTML
-            html_message = render_to_string(
-                'email/recuperacao_senha.html',
-                contexto
-            )
-            
-            # Versão em texto
-            text_message = strip_tags(html_message)
-            
-            # Enviar email
+            html = render_to_string(template, contexto)
             email = EmailMultiAlternatives(
-                subject='🔐 Código de Recuperação de Senha - App Integrador',
-                body=text_message,
+                subject=assunto,
+                body=strip_tags(html),
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[token_obj.email_enviado_para]
+                to=[para],
             )
-            
-            email.attach_alternative(html_message, "text/html")
+            email.attach_alternative(html, 'text/html')
             email.send()
-            
-            logger.info(f"Token de recuperação enviado para {token_obj.email_enviado_para}")
             return True
-            
-        except Exception as e:
-            logger.error(f"Erro ao enviar email de recuperação: {e}")
+        except Exception:
+            logger.exception('Erro ao enviar e-mail "%s" para %s', assunto, para)
             return False
-    
+
     @staticmethod
-    def enviar_confirmacao_resetar_senha(usuario, nova_senha):
-        """
-        Envia confirmação de que a senha foi resetada
-        """
-        try:
-            contexto = {
-                'usuario': usuario.get_full_name() or usuario.username,
-                'email': usuario.email,
-            }
-            
-            html_message = render_to_string(
-                'email/confirmacao_senha_resetada.html',
-                contexto
-            )
-            
-            text_message = strip_tags(html_message)
-            
-            email = EmailMultiAlternatives(
-                subject='Senha Resetada com Sucesso - App Integrador',
-                body=text_message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                to=[usuario.email]
-            )
-            
-            email.attach_alternative(html_message, "text/html")
-            email.send()
-            
-            logger.info(f"Confirmação de reset enviada para {usuario.email}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Erro ao enviar confirmação: {e}")
-            return False
-        
+    def enviar_token_recuperacao(usuario, token_obj) -> bool:
+        contexto = {
+            'usuario': usuario.get_full_name() or usuario.username,
+            'token': token_obj.token,
+            'tempo_expiracao': 15,
+            'link': f"{settings.FRONTEND_URL.rstrip('/')}/forgot-password",
+        }
+        ok = EnviadorEmail._enviar(
+            'Código de recuperação de senha - MangeTech',
+            'email/recuperacao_senha.html',
+            contexto,
+            token_obj.email_enviado_para,
+        )
+        if ok:
+            logger.info('Código de recuperação enviado para %s', token_obj.email_enviado_para)
+        return ok
+
+    @staticmethod
+    def enviar_confirmacao_resetar_senha(usuario) -> bool:
+        contexto = {
+            'usuario': usuario.get_full_name() or usuario.username,
+            'link': f"{settings.FRONTEND_URL.rstrip('/')}/login",
+        }
+        return EnviadorEmail._enviar(
+            'Sua senha foi alterada - MangeTech',
+            'email/confirmacao_senha_resetada.html',
+            contexto,
+            usuario.email,
+        )

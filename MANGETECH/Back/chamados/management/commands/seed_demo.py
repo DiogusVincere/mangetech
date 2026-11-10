@@ -10,7 +10,8 @@ cria o que falta. A senha dos usuários é pública de propósito e é reposta a
 cada execução, para o login de demonstração nunca parar de funcionar.
 """
 
-from datetime import timedelta
+from datetime import date, timedelta
+from decimal import Decimal
 
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -35,22 +36,26 @@ USUARIOS = [
 
 ATIVOS = [
     dict(
-        codigo='AST-001', nome='Compressor de ar parafuso', modelo='GA 22',
+        codigo='AST-001', data_aquisicao=date(2019, 4, 17), valor=Decimal('148500.00'), garantia_meses=36,
+        nome='Compressor de ar parafuso', modelo='GA 22',
         fabricante='Atlas Copco', numero_serie='AC-22-2019-0417',
         fornecedor='Atlas Copco Brasil', ambiente='Sala de compressores', status='Ativo',
     ),
     dict(
-        codigo='AST-002', nome='Empilhadeira elétrica', modelo='RX 20-16',
+        codigo='AST-002', data_aquisicao=date(2021, 2, 8), valor=Decimal('96800.00'), garantia_meses=60,
+        nome='Empilhadeira elétrica', modelo='RX 20-16',
         fabricante='Still', numero_serie='ST-516-2021-0088',
         fornecedor='Still Brasil', ambiente='Expedição', status='Manutenção',
     ),
     dict(
-        codigo='AST-003', nome='Torno CNC', modelo='GL 240M',
+        codigo='AST-003', data_aquisicao=date(2018, 11, 23), valor=Decimal('412000.00'), garantia_meses=24,
+        nome='Torno CNC', modelo='GL 240M',
         fabricante='Romi', numero_serie='RM-240-2018-1193',
         fornecedor='Romi', ambiente='Usinagem', status='Ativo',
     ),
     dict(
-        codigo='AST-004', nome='Ar-condicionado split', modelo='36.000 BTU',
+        codigo='AST-004', data_aquisicao=date(2017, 6, 2), valor=Decimal('7490.00'), garantia_meses=12,
+        nome='Ar-condicionado split', modelo='36.000 BTU',
         fabricante='Carrier', numero_serie='CR-36-2017-2231',
         fornecedor='Friotec Climatização', ambiente='Sala de reuniões', status='Inativo',
     ),
